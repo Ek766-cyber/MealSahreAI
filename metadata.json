@@ -1,0 +1,5 @@
+{
+  "name": "MealShare AI",
+  "description": "Track shared meal expenses, calculate debts, and automate friendly AI-generated payment reminders.",
+  "requestFramePermissions": []
+}
