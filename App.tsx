@@ -11,7 +11,7 @@ import { dbService } from './services/dbService';
 const App: React.FC = () => {
   // Auth State
   const [user, setUser] = useState<User | null>(null);
-  
+
   // App Data
   const [people, setPeople] = useState<Person[]>([]);
   const [isSyncing, setIsSyncing] = useState(false);
@@ -34,28 +34,38 @@ const App: React.FC = () => {
     localStorage.setItem('mealshare_user', JSON.stringify(newUser));
   };
 
-  const handleLogout = () => {
-    setUser(null);
-    localStorage.removeItem('mealshare_user');
-    setPeople([]);
+  const handleLogout = async () => {
+    try {
+      const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+      await fetch(`${API_URL}/auth/logout`, {
+        method: 'POST',
+        credentials: 'include'
+      });
+    } catch (error) {
+      console.error('Logout error:', error);
+    } finally {
+      setUser(null);
+      localStorage.removeItem('mealshare_user');
+      setPeople([]);
+    }
   };
 
   // --- CORE LOGIC: Meal Rate Calculation ---
   const { balances, totalCost, totalMeals, mealRate } = useMemo(() => {
     const totalC = people.reduce((sum, p) => sum + p.contribution, 0);
     const totalM = people.reduce((sum, p) => sum + p.meals, 0);
-    
+
     // Priority: 1. Rate from Sheet, 2. Calculated Rate
-    const rate = sheetMealRate !== null && sheetMealRate > 0 
-      ? sheetMealRate 
+    const rate = sheetMealRate !== null && sheetMealRate > 0
+      ? sheetMealRate
       : (totalM > 0 ? totalC / totalM : 0);
 
     const calculatedBalances: Balance[] = people.map(person => {
       const cost = person.meals * rate;
-      const balance = person.customBalance !== undefined 
-        ? person.customBalance 
+      const balance = person.customBalance !== undefined
+        ? person.customBalance
         : (person.contribution - cost);
-      
+
       let status: Balance['status'] = 'SETTLED';
       if (balance > 1) status = 'OWED';
       if (balance < -1) status = 'OWES';
@@ -71,11 +81,11 @@ const App: React.FC = () => {
       };
     }).sort((a, b) => a.balance - b.balance);
 
-    return { 
-      balances: calculatedBalances, 
-      totalCost: totalC, 
+    return {
+      balances: calculatedBalances,
+      totalCost: totalC,
       totalMeals: totalM,
-      mealRate: rate 
+      mealRate: rate
     };
   }, [people, sheetMealRate]);
 
@@ -84,10 +94,10 @@ const App: React.FC = () => {
     setIsSyncing(true);
     try {
       setLastSheetUrl(url);
-      
+
       // 1. Fetch from Sheet
       const { people: sheetPeople, hasContribution, extractedRate } = await fetchSheetData(url);
-      
+
       // 2. Fetch from Database (Contact Info)
       const dbMembers = await dbService.getMembers();
 
@@ -99,11 +109,11 @@ const App: React.FC = () => {
         setPeople(currentPeople => {
           // Map to lowercase for easy lookup
           const dbMap = new Map(dbMembers.map(m => [m.sheetName.toLowerCase().trim(), m.email]));
-          
+
           return sheetPeople.map(sp => {
             // MERGE: Sheet Data + Database Email
             const dbEmail = dbMap.get(sp.name.toLowerCase().trim());
-            
+
             // If this person already existed in our state, we can preserve other fields if needed, 
             // but usually Sheet + DB is the source of truth.
             return {
@@ -144,30 +154,30 @@ const App: React.FC = () => {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
             <div className="flex items-center gap-2">
-               <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center text-white font-bold shadow-sm">M</div>
-               <h1 className="text-xl font-bold text-gray-900 tracking-tight">MealShare AI</h1>
+              <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center text-white font-bold shadow-sm">M</div>
+              <h1 className="text-xl font-bold text-gray-900 tracking-tight">MealShare AI</h1>
             </div>
             <div className="flex items-center gap-4 text-sm">
-               <div className="hidden md:flex items-center gap-3">
-                 <div className="flex flex-col items-end">
-                   <span className="font-semibold text-gray-700">{user.name}</span>
-                   <span className="text-xs text-gray-400">{user.email}</span>
-                 </div>
-                 {user.photoURL ? (
-                   <img src={user.photoURL} alt="Profile" className="w-9 h-9 rounded-full border border-gray-200" />
-                 ) : (
-                   <div className="w-9 h-9 rounded-full bg-indigo-100 flex items-center justify-center text-indigo-700 font-bold border border-indigo-200">
-                     {user.name.charAt(0)}
-                   </div>
-                 )}
-               </div>
-               <button 
+              <div className="hidden md:flex items-center gap-3">
+                <div className="flex flex-col items-end">
+                  <span className="font-semibold text-gray-700">{user.name}</span>
+                  <span className="text-xs text-gray-400">{user.email}</span>
+                </div>
+                {user.photoURL ? (
+                  <img src={user.photoURL} alt="Profile" className="w-9 h-9 rounded-full border border-gray-200" />
+                ) : (
+                  <div className="w-9 h-9 rounded-full bg-indigo-100 flex items-center justify-center text-indigo-700 font-bold border border-indigo-200">
+                    {user.name.charAt(0)}
+                  </div>
+                )}
+              </div>
+              <button
                 onClick={handleLogout}
                 className="text-gray-500 hover:text-red-600 transition p-1"
                 title="Logout"
-               >
-                 <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" /></svg>
-               </button>
+              >
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" /></svg>
+              </button>
             </div>
           </div>
         </div>
@@ -183,48 +193,48 @@ const App: React.FC = () => {
           </div>
           {lastSheetUrl && (
             <div className="text-xs text-green-600 font-medium bg-green-50 px-3 py-2 rounded-lg border border-green-200">
-               ● Linked to Google Sheet
+              ● Linked to Google Sheet
             </div>
           )}
         </div>
 
         {/* Dashboard Section */}
-        <Dashboard 
-          balances={balances} 
-          totalCost={totalCost} 
-          totalMeals={totalMeals} 
+        <Dashboard
+          balances={balances}
+          totalCost={totalCost}
+          totalMeals={totalMeals}
           mealRate={mealRate}
         />
 
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 h-[600px]">
           {/* Left Column: Data Manager (4 cols) */}
           <div className="lg:col-span-5 h-full flex flex-col gap-4">
-             <DataEntry 
-               people={people} 
-               balances={balances}
-               onUpdatePerson={() => {}} // Disabled for sheet mode
-               onAddPerson={() => {}}    // Disabled for sheet mode
-               onSyncSheet={handleSyncSheet}
-               isSyncing={isSyncing}
-             />
-             
-             {/* Database Control */}
-             <button 
-               onClick={() => setShowMemberManager(true)}
-               className="w-full bg-slate-800 text-white p-3 rounded-lg shadow-sm hover:bg-slate-700 transition flex items-center justify-between group"
-             >
-               <span className="flex items-center gap-2 font-semibold">
-                 <svg className="w-5 h-5 text-slate-400 group-hover:text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4m0 5c0 2.21-3.582 4-8 4s-8-1.79-8-4" /></svg>
-                 Manage Database Members
-               </span>
-               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /></svg>
-             </button>
+            <DataEntry
+              people={people}
+              balances={balances}
+              onUpdatePerson={() => { }} // Disabled for sheet mode
+              onAddPerson={() => { }}    // Disabled for sheet mode
+              onSyncSheet={handleSyncSheet}
+              isSyncing={isSyncing}
+            />
+
+            {/* Database Control */}
+            <button
+              onClick={() => setShowMemberManager(true)}
+              className="w-full bg-slate-800 text-white p-3 rounded-lg shadow-sm hover:bg-slate-700 transition flex items-center justify-between group"
+            >
+              <span className="flex items-center gap-2 font-semibold">
+                <svg className="w-5 h-5 text-slate-400 group-hover:text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4m0 5c0 2.21-3.582 4-8 4s-8-1.79-8-4" /></svg>
+                Manage Database Members
+              </span>
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /></svg>
+            </button>
           </div>
 
           {/* Right Column: Notification Logic (8 cols) */}
           <div className="lg:col-span-7 h-full">
-            <NotificationCenter 
-              balances={balances} 
+            <NotificationCenter
+              balances={balances}
               mealRate={mealRate}
               onRefreshData={handleRefresh}
             />
@@ -234,8 +244,8 @@ const App: React.FC = () => {
 
       {/* Modals */}
       {showMemberManager && (
-        <MemberManager 
-          onClose={() => setShowMemberManager(false)} 
+        <MemberManager
+          onClose={() => setShowMemberManager(false)}
           onDataChanged={handleRefresh}
         />
       )}

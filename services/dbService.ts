@@ -1,57 +1,105 @@
 import { DBMember } from '../types';
 
 /**
- * SIMULATED MONGODB SERVICE
- * In a real production app, these functions would make API calls (fetch/axios)
- * to your backend server which connects to MongoDB.
- * 
- * For this demo, we use LocalStorage so you can verify the functionality immediately.
+ * MONGODB SERVICE
+ * This service now makes API calls to the backend server
+ * which connects to MongoDB.
  */
 
-const DB_KEY = 'mealshare_db_members';
-
-const delay = (ms: number) => new Promise(res => setTimeout(res, ms));
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
 
 export const dbService = {
-  // Simulate fetching all members from MongoDB
+  // Fetch all members from MongoDB
   getMembers: async (): Promise<DBMember[]> => {
-    await delay(300); // Simulate network latency
-    const raw = localStorage.getItem(DB_KEY);
-    return raw ? JSON.parse(raw) : [];
+    try {
+      const response = await fetch(`${API_URL}/api/members`, {
+        credentials: 'include'
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to fetch members');
+      }
+
+      const members = await response.json();
+      
+      // Transform MongoDB documents to match DBMember interface
+      return members.map((m: any) => ({
+        _id: m._id,
+        sheetName: m.sheetName,
+        email: m.email,
+        phone: m.phone
+      }));
+    } catch (error) {
+      console.error('Error fetching members:', error);
+      return [];
+    }
   },
 
-  // Simulate adding a member to MongoDB
+  // Add a member to MongoDB
   addMember: async (member: Omit<DBMember, '_id'>): Promise<DBMember> => {
-    await delay(300);
-    const members = await dbService.getMembers();
-    
-    // Check duplicates
-    if (members.find(m => m.sheetName.toLowerCase() === member.sheetName.toLowerCase())) {
-      throw new Error("A member with this Sheet Name already exists.");
-    }
+    try {
+      const response = await fetch(`${API_URL}/api/members`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        credentials: 'include',
+        body: JSON.stringify(member)
+      });
 
-    const newMember: DBMember = { ...member, _id: Date.now().toString() };
-    members.push(newMember);
-    localStorage.setItem(DB_KEY, JSON.stringify(members));
-    return newMember;
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || 'Failed to add member');
+      }
+
+      const newMember = await response.json();
+      
+      return {
+        _id: newMember._id,
+        sheetName: newMember.sheetName,
+        email: newMember.email,
+        phone: newMember.phone
+      };
+    } catch (error: any) {
+      throw new Error(error.message || 'Failed to add member');
+    }
   },
 
-  // Simulate updating a member
+  // Update a member
   updateMember: async (id: string, updates: Partial<DBMember>): Promise<void> => {
-    await delay(200);
-    const members = await dbService.getMembers();
-    const idx = members.findIndex(m => m._id === id);
-    if (idx !== -1) {
-      members[idx] = { ...members[idx], ...updates };
-      localStorage.setItem(DB_KEY, JSON.stringify(members));
+    try {
+      const response = await fetch(`${API_URL}/api/members/${id}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        credentials: 'include',
+        body: JSON.stringify(updates)
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || 'Failed to update member');
+      }
+    } catch (error: any) {
+      throw new Error(error.message || 'Failed to update member');
     }
   },
 
-  // Simulate deleting a member
+  // Delete a member
   deleteMember: async (id: string): Promise<void> => {
-    await delay(200);
-    const members = await dbService.getMembers();
-    const filtered = members.filter(m => m._id !== id);
-    localStorage.setItem(DB_KEY, JSON.stringify(filtered));
+    try {
+      const response = await fetch(`${API_URL}/api/members/${id}`, {
+        method: 'DELETE',
+        credentials: 'include'
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || 'Failed to delete member');
+      }
+    } catch (error: any) {
+      throw new Error(error.message || 'Failed to delete member');
+    }
   }
 };
