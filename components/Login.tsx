@@ -1,35 +1,55 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { User } from '../types';
 
 interface LoginProps {
   onLogin: (user: User) => void;
 }
 
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+
 export const Login: React.FC<LoginProps> = ({ onLogin }) => {
   const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  // Check if user is already authenticated on mount
+  useEffect(() => {
+    checkAuth();
+  }, []);
+
+  const checkAuth = async () => {
+    try {
+      const response = await fetch(`${API_URL}/auth/user`, {
+        credentials: 'include'
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        if (data.user) {
+          onLogin({
+            id: data.user._id,
+            email: data.user.email,
+            name: data.user.name,
+            photoURL: data.user.photoURL
+          });
+        }
+      }
+    } catch (err) {
+      console.error('Auth check failed:', err);
+    }
+  };
 
   const handleGoogleSignIn = () => {
     setIsLoading(true);
+    setError(null);
 
-    // --- GOOGLE SSO SIMULATION ---
-    // In a production app, you would use the Google Identity Services SDK here.
-    // Example: window.google.accounts.id.prompt();
-    
-    setTimeout(() => {
-      // Return a mock Google User object
-      onLogin({
-        id: 'google-1122334455',
-        email: 'alex.user@gmail.com',
-        name: 'Alex User',
-        photoURL: 'https://ui-avatars.com/api/?name=Alex+User&background=random&size=128' 
-      });
-    }, 1500);
+    // Redirect to Google OAuth endpoint
+    window.location.href = `${API_URL}/auth/google`;
   };
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50 px-4 font-sans">
       <div className="max-w-md w-full bg-white rounded-2xl shadow-xl p-10 border border-gray-100 flex flex-col items-center">
-        
+
         {/* App Logo */}
         <div className="w-16 h-16 bg-primary rounded-2xl flex items-center justify-center text-white font-bold text-3xl shadow-lg mb-6">
           M
@@ -41,20 +61,26 @@ export const Login: React.FC<LoginProps> = ({ onLogin }) => {
         </p>
 
         <div className="w-full mt-8">
+          {error && (
+            <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">
+              {error}
+            </div>
+          )}
+
           {/* Google Button */}
-          <button 
+          <button
             onClick={handleGoogleSignIn}
             disabled={isLoading}
             className="w-full flex items-center justify-center gap-3 bg-white border border-gray-300 hover:bg-gray-50 text-gray-700 font-medium py-3 px-4 rounded-xl transition-all duration-200 shadow-sm hover:shadow active:scale-[0.98] disabled:opacity-70 disabled:cursor-not-allowed group relative overflow-hidden"
           >
             {isLoading ? (
-               <div className="flex items-center gap-2">
-                 <svg className="animate-spin h-5 w-5 text-gray-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                   <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                   <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                 </svg>
-                 <span>Connecting to Google...</span>
-               </div>
+              <div className="flex items-center gap-2">
+                <svg className="animate-spin h-5 w-5 text-gray-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+                <span>Connecting to Google...</span>
+              </div>
             ) : (
               <>
                 <svg className="w-5 h-5" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
@@ -70,11 +96,11 @@ export const Login: React.FC<LoginProps> = ({ onLogin }) => {
         </div>
 
         <div className="mt-8 flex items-center justify-center gap-2 text-xs text-gray-400">
-           <svg className="w-3 h-3 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
-           <span>Secure Single Sign-On enabled</span>
+          <svg className="w-3 h-3 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+          <span>Secure Single Sign-On enabled</span>
         </div>
       </div>
-      
+
       <div className="absolute bottom-6 text-center text-xs text-gray-400">
         &copy; {new Date().getFullYear()} MealShare AI. All rights reserved.
       </div>
