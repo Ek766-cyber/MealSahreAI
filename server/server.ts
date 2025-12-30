@@ -10,6 +10,9 @@ import passport from './config/passport.js';
 import { connectDB } from './config/database.js';
 import authRoutes from './routes/auth.js';
 import memberRoutes from './routes/members.js';
+import notificationRoutes from './routes/notifications.js';
+import sheetRoutes from './routes/sheet.js';
+import { schedulerService } from './services/schedulerService.js';
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -17,9 +20,15 @@ const PORT = process.env.PORT || 5000;
 // Connect to MongoDB
 connectDB();
 
+// Initialize notification schedulers after DB connection
+setTimeout(async () => {
+  console.log('🕐 Initializing notification schedulers...');
+  await schedulerService.initializeAllSchedulers();
+}, 2000); // Give DB time to connect
+
 // Middleware
 app.use(cors({
-  origin: process.env.CLIENT_URL || 'http://localhost:5173',
+  origin: process.env.CLIENT_URL || 'http://localhost:3001',
   credentials: true
 }));
 
@@ -43,9 +52,22 @@ app.use(session({
 app.use(passport.initialize());
 app.use(passport.session());
 
+// Debug middleware to log authentication status
+app.use((req, res, next) => {
+  if (req.path.startsWith('/api/')) {
+    console.log(`📍 ${req.method} ${req.path} - Auth: ${req.isAuthenticated() ? '✅' : '❌'}`);
+    if (req.isAuthenticated() && req.user) {
+      console.log(`   User: ${(req.user as any).email}`);
+    }
+  }
+  next();
+});
+
 // Routes
 app.use('/auth', authRoutes);
 app.use('/api/members', memberRoutes);
+app.use('/api/notifications', notificationRoutes);
+app.use('/api/sheet', sheetRoutes);
 
 // Health check
 app.get('/health', (req, res) => {

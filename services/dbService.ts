@@ -6,7 +6,12 @@ import { DBMember } from '../types';
  * which connects to MongoDB.
  */
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+// Support both browser (import.meta.env) and Node.js (process.env)
+const API_URL = (typeof import.meta !== 'undefined' && import.meta.env?.VITE_API_URL) 
+  ? import.meta.env.VITE_API_URL 
+  : (typeof process !== 'undefined' && process.env?.VITE_API_URL) 
+  ? process.env.VITE_API_URL 
+  : 'http://localhost:5000';
 
 export const dbService = {
   // Fetch all members from MongoDB

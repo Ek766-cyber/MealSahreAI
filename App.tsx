@@ -23,11 +23,75 @@ const App: React.FC = () => {
 
   // --- PERSISTENCE: Check for existing session ---
   useEffect(() => {
-    const savedUser = localStorage.getItem('mealshare_user');
-    if (savedUser) {
-      setUser(JSON.parse(savedUser));
-    }
+    const checkAuth = async () => {
+      try {
+        const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+        const response = await fetch(`${API_URL}/auth/user`, {
+          credentials: 'include'
+        });
+
+        if (response.ok) {
+          const data = await response.json();
+          if (data.user) {
+            const authenticatedUser = {
+              id: data.user._id,
+              email: data.user.email,
+              name: data.user.name,
+              photoURL: data.user.photoURL
+            };
+            setUser(authenticatedUser);
+            localStorage.setItem('mealshare_user', JSON.stringify(authenticatedUser));
+            console.log('✅ User authenticated:', data.user.email);
+
+            // Load saved synced data after authentication
+            loadSyncedData();
+          }
+        } else {
+          // Clear localStorage if backend session is invalid
+          localStorage.removeItem('mealshare_user');
+          setUser(null);
+        }
+      } catch (error) {
+        console.error('Auth check failed:', error);
+        // Try localStorage as fallback
+        const savedUser = localStorage.getItem('mealshare_user');
+        if (savedUser) {
+          console.warn('⚠️ Using cached user from localStorage (backend auth check failed)');
+          setUser(JSON.parse(savedUser));
+          // Still try to load synced data
+          loadSyncedData();
+        }
+      }
+    };
+
+    checkAuth();
   }, []);
+
+  // Load synced data from database
+  const loadSyncedData = async () => {
+    try {
+      const response = await fetch('http://localhost:5000/api/sheet/config', {
+        credentials: 'include'
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        if (data.syncedPeople && data.syncedPeople.length > 0) {
+          setPeople(data.syncedPeople);
+          console.log(`✅ Loaded ${data.syncedPeople.length} synced people from database`);
+        }
+        if (data.sheetMealRate !== null && data.sheetMealRate !== undefined) {
+          setSheetMealRate(data.sheetMealRate);
+          console.log('✅ Loaded sheet meal rate from database:', data.sheetMealRate);
+        }
+        if (data.csvUrl) {
+          setLastSheetUrl(data.csvUrl);
+        }
+      }
+    } catch (error) {
+      console.error('Error loading synced data:', error);
+    }
+  };
 
   const handleLogin = (newUser: User) => {
     setUser(newUser);
@@ -106,22 +170,42 @@ const App: React.FC = () => {
       else setSheetMealRate(null);
 
       if (sheetPeople.length > 0) {
-        setPeople(currentPeople => {
+        const updatedPeople = sheetPeople.map(sp => {
           // Map to lowercase for easy lookup
           const dbMap = new Map(dbMembers.map(m => [m.sheetName.toLowerCase().trim(), m.email]));
 
-          return sheetPeople.map(sp => {
-            // MERGE: Sheet Data + Database Email
-            const dbEmail = dbMap.get(sp.name.toLowerCase().trim());
+          // MERGE: Sheet Data + Database Email
+          const dbEmail = dbMap.get(sp.name.toLowerCase().trim());
 
-            // If this person already existed in our state, we can preserve other fields if needed, 
-            // but usually Sheet + DB is the source of truth.
-            return {
-              ...sp,
-              email: dbEmail || sp.email // Prefer DB email, fallback to generated
-            };
-          });
+          return {
+            ...sp,
+            email: dbEmail || sp.email // Prefer DB email, fallback to generated
+          };
         });
+
+        setPeople(updatedPeople);
+
+        // 4. Save synced data to database
+        try {
+          const saveResponse = await fetch('http://localhost:5000/api/sheet/save-data', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'include',
+            body: JSON.stringify({
+              people: updatedPeople,
+              sheetMealRate: extractedRate || null
+            })
+          });
+
+          if (saveResponse.ok) {
+            const saveData = await saveResponse.json();
+            console.log(`✅ Synced data saved to database: ${saveData.peopleCount} people`);
+          } else {
+            console.warn('⚠️ Failed to save synced data to database');
+          }
+        } catch (saveError) {
+          console.error('Error saving synced data:', saveError);
+        }
 
         const rateMsg = extractedRate ? `\nFound Meal Rate: ${extractedRate}` : '';
         // Only alert if manual sync (hacky check: if syncing takes < 200ms it might be auto, but let's just alert always for now or silence it for auto-sync in future)
