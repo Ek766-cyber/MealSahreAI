@@ -141,7 +141,7 @@ const parseCSV = (csvText: string): SheetResult => {
            people.push({
              id: `sheet-summary-${i}`,
              name: name,
-             email: `${name.toLowerCase().replace(/\s/g, '')}@example.com`,
+             email: '',
              meals: meals, 
              contribution: cost + balance, // Reverse calculate contribution so App logic (Contrib - Cost) works somewhat, but we rely on customBalance.
              customBalance: balance // Force exact balance
@@ -173,7 +173,7 @@ const parseCSV = (csvText: string): SheetResult => {
        people.push({
          id: `sheet-list-${i}`,
          name: name,
-         email: `${name}@example.com`,
+         email: '',
          meals: parseFloat(parts[simpleMealIdx]) || 0,
          contribution: simplePaidIdx !== -1 ? (parseFloat(parts[simplePaidIdx]) || 0) : 0
        });

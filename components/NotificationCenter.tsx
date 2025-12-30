@@ -13,9 +13,9 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({ balances
   const [showConfig, setShowConfig] = useState(false);
   const [scheduledTime, setScheduledTime] = useState('18:00');
   const [threshold, setThreshold] = useState(100);
-  const [webhookUrl, setWebhookUrl] = useState('');
-  const [autoSend, setAutoSend] = useState(false); // If true, sends via webhook automatically
-  
+  const [emailEnabled, setEmailEnabled] = useState(false);
+  const [autoSend, setAutoSend] = useState(false); // If true, sends via email automatically
+
   // Operational State
   const [isEnabled, setIsEnabled] = useState(false);
   const [lastRun, setLastRun] = useState<string | null>(null);
@@ -23,6 +23,80 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({ balances
   const [reminders, setReminders] = useState<Partial<Reminder>[]>([]);
   const [tone, setTone] = useState('friendly');
   const [sendStatus, setSendStatus] = useState<Record<string, 'sent' | 'error' | 'idle'>>({});
+  const [isLoadingConfig, setIsLoadingConfig] = useState(true);
+
+  // Load notification configuration on mount
+  useEffect(() => {
+    const loadConfig = async () => {
+      try {
+        const response = await fetch('http://localhost:5000/api/notifications/config', {
+          credentials: 'include'
+        });
+
+        if (response.status === 401) {
+          console.warn('⚠️ Not authenticated - skipping notification config load');
+          setIsLoadingConfig(false);
+          return;
+        }
+
+        if (response.ok) {
+          const data = await response.json();
+          if (data.success && data.config) {
+            const config = data.config;
+            setScheduledTime(config.scheduledTime || '18:00');
+            setThreshold(config.threshold || 100);
+            setEmailEnabled(config.emailEnabled || false);
+            setAutoSend(config.autoSend || false);
+            setIsEnabled(config.isEnabled || false);
+            setTone(config.tone || 'friendly');
+            console.log('✅ Loaded notification config:', config);
+          }
+        }
+      } catch (error) {
+        console.error('Error loading notification config:', error);
+      } finally {
+        setIsLoadingConfig(false);
+      }
+    };
+
+    loadConfig();
+  }, []);
+
+  // Save notification configuration when settings change
+  useEffect(() => {
+    if (isLoadingConfig) return; // Don't save during initial load
+
+    const saveConfig = async () => {
+      try {
+        const response = await fetch('http://localhost:5000/api/notifications/config', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify({
+            scheduledTime,
+            threshold,
+            emailEnabled,
+            autoSend,
+            isEnabled,
+            tone
+          })
+        });
+
+        if (response.status === 401) {
+          console.warn('⚠️ Not authenticated - notification config not saved');
+        } else if (response.ok) {
+          const data = await response.json();
+          console.log('✅ Notification config saved:', data.config);
+        } else {
+          console.error('Failed to save notification config');
+        }
+      } catch (error) {
+        console.error('Error saving notification config:', error);
+      }
+    };
+
+    saveConfig();
+  }, [scheduledTime, threshold, emailEnabled, autoSend, isEnabled, tone, isLoadingConfig]);
 
   // Scheduler
   useEffect(() => {
@@ -38,19 +112,19 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({ balances
         setLastRun(currentTimeStr);
         runScheduledTask();
       }
-    }, 5000); 
+    }, 5000);
 
     return () => clearInterval(interval);
-  }, [isEnabled, scheduledTime, lastRun, balances, tone, threshold, webhookUrl, autoSend]);
+  }, [isEnabled, scheduledTime, lastRun, balances, tone, threshold, emailEnabled, autoSend]);
 
   const runScheduledTask = async () => {
     if ("Notification" in window && Notification.permission === "granted") {
       new Notification("MealShare AI", { body: "Daily meal audit started..." });
     }
-    
+
     // 1. Refresh Data
     onRefreshData();
-    
+
     // 2. Generate (Wait a bit for React state to settle if needed, or just run)
     // Ideally we'd await onRefreshData if it was async, but here we proceed optimistically
     setIsGenerating(true);
@@ -59,7 +133,7 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({ balances
     setIsGenerating(false);
 
     // 3. Auto-Send if configured
-    if (autoSend && webhookUrl && results.length > 0) {
+    if (autoSend && emailEnabled && results.length > 0) {
       handleBatchSend(results);
     }
   };
@@ -75,26 +149,62 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({ balances
   const handleSend = async (reminder: Partial<Reminder>) => {
     if (!reminder.personId) return;
 
-    if (!webhookUrl) {
-      alert(`[SIMULATION]\nTo: ${reminder.name}\nMsg: ${reminder.message}\n\n(Configure a Webhook URL to actually send this)`);
+    if (!emailEnabled) {
+      // Silent notification instead of alert
       setSendStatus(prev => ({ ...prev, [reminder.personId!]: 'sent' }));
+      console.log(`[SIMULATION] Email to ${reminder.name}: ${reminder.message}`);
       return;
     }
 
     try {
-      await fetch(webhookUrl, {
+      console.log('Sending email for:', reminder.name);
+
+      const response = await fetch('http://localhost:5000/api/notifications/send-email', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
         body: JSON.stringify({
-          text: `MealShare Alert for ${reminder.name}: ${reminder.message}`,
-          ...reminder
+          personId: reminder.personId,
+          name: reminder.name,
+          message: reminder.message,
+          amountOwed: reminder.amountOwed
         })
       });
-      setSendStatus(prev => ({ ...prev, [reminder.personId!]: 'sent' }));
-    } catch (e) {
-      console.error(e);
-      alert("Failed to send to Webhook. Check console.");
+
+      if (response.status === 401) {
+        console.warn('⚠️ Authentication required. Please make sure you are logged in.');
+        setSendStatus(prev => ({ ...prev, [reminder.personId!]: 'error' }));
+        return;
+      }
+
+      const data = await response.json();
+      console.log('Email API response:', data);
+
+      if (data.success) {
+        setSendStatus(prev => ({ ...prev, [reminder.personId!]: 'sent' }));
+        console.log(`✅ Email sent to ${reminder.name}`);
+
+        // Silent browser notification instead of alert
+        if ("Notification" in window && Notification.permission === "granted") {
+          new Notification("Email Sent", {
+            body: `Successfully sent email to ${reminder.name}`,
+            icon: '/favicon.ico'
+          });
+        }
+      } else {
+        throw new Error(data.error || 'Failed to send email');
+      }
+    } catch (e: any) {
+      console.error('Email send error:', e);
       setSendStatus(prev => ({ ...prev, [reminder.personId!]: 'error' }));
+
+      // Silent browser notification instead of alert
+      if ("Notification" in window && Notification.permission === "granted") {
+        new Notification("Email Failed", {
+          body: `Failed to send email to ${reminder.name}`,
+          icon: '/favicon.ico'
+        });
+      }
     }
   };
 
@@ -103,7 +213,7 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({ balances
       await handleSend(r);
     }
     if ("Notification" in window && Notification.permission === "granted") {
-      new Notification("MealShare AI", { body: `Sent ${list.length} reminders via Webhook.` });
+      new Notification("MealShare AI", { body: `Sent ${list.length} reminders via Email.` });
     }
   };
 
@@ -113,8 +223,19 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({ balances
         <div>
           <h2 className="text-xl font-bold text-gray-800">Notification Center</h2>
           <p className="text-sm text-gray-500">AI-powered debt collection & reminders.</p>
+          {isEnabled && autoSend && emailEnabled && (
+            <div className="mt-2 flex items-center gap-2 text-xs">
+              <span className="inline-flex items-center px-2 py-1 rounded-full bg-green-100 text-green-700 font-medium">
+                <svg className="w-3 h-3 mr-1" fill="currentColor" viewBox="0 0 20 20">
+                  <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                </svg>
+                Auto-Send Active
+              </span>
+              <span className="text-gray-500">Runs daily at {scheduledTime} (even when tab is closed)</span>
+            </div>
+          )}
         </div>
-        <button 
+        <button
           onClick={() => setShowConfig(!showConfig)}
           className="p-2 hover:bg-gray-100 rounded-full text-gray-500 transition"
           title="Configure Settings"
@@ -127,13 +248,13 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({ balances
       {showConfig && (
         <div className="bg-slate-50 border border-slate-200 rounded-lg p-4 mb-4 text-sm animate-fade-in">
           <h4 className="font-bold text-slate-700 mb-3 border-b border-slate-200 pb-2">Configuration</h4>
-          
+
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
             <div>
               <label className="block text-xs font-semibold text-slate-500 mb-1">Low Balance Threshold ($)</label>
-              <input 
-                type="number" 
-                value={threshold} 
+              <input
+                type="number"
+                value={threshold}
                 onChange={e => setThreshold(Number(e.target.value))}
                 className="w-full px-2 py-1.5 border rounded"
               />
@@ -141,8 +262,8 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({ balances
             </div>
             <div>
               <label className="block text-xs font-semibold text-slate-500 mb-1">AI Tone</label>
-              <select 
-                value={tone} 
+              <select
+                value={tone}
                 onChange={e => setTone(e.target.value)}
                 className="w-full px-2 py-1.5 border rounded"
               >
@@ -155,30 +276,86 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({ balances
           </div>
 
           <div className="mb-4">
-            <label className="block text-xs font-semibold text-slate-500 mb-1">Webhook URL (Optional)</label>
-            <input 
-              type="text" 
-              placeholder="https://discord.com/api/webhooks/..." 
-              value={webhookUrl} 
-              onChange={e => setWebhookUrl(e.target.value)}
-              className="w-full px-2 py-1.5 border rounded"
-            />
-            <p className="text-[10px] text-slate-400 mt-1">If set, 'Send' buttons will POST data to this URL (e.g., Slack/Discord/Zapier).</p>
+            <label className="block text-xs font-semibold text-slate-500 mb-1">Email Service</label>
+            <button
+              onClick={async () => {
+                try {
+                  const response = await fetch('http://localhost:5000/api/notifications/email-status', {
+                    credentials: 'include'
+                  });
+
+                  if (response.status === 401) {
+                    console.warn('⚠️ Authentication required. Please login first.');
+                    if ("Notification" in window && Notification.permission === "granted") {
+                      new Notification("Authentication Required", {
+                        body: "Please login to check email status",
+                        icon: '/favicon.ico'
+                      });
+                    }
+                    return;
+                  }
+
+                  const data = await response.json();
+                  const status = data.configured && data.verified
+                    ? `✅ Email service is configured and verified!\n\nHost: ${data.host}:${data.port}\nUser: ${data.user}`
+                    : data.configured
+                      ? '⚠️ Email is configured but connection verification failed.'
+                      : '❌ Email service is not configured.';
+
+                  console.log(status);
+
+                  if (data.configured && data.verified) {
+                    setEmailEnabled(true);
+                    if ("Notification" in window && Notification.permission === "granted") {
+                      new Notification("Email Configured", {
+                        body: "Email service is ready to use",
+                        icon: '/favicon.ico'
+                      });
+                    }
+                  }
+                } catch (e) {
+                  console.error('Email status check error:', e);
+                }
+              }}
+              className="w-full px-3 py-2 bg-blue-50 border border-blue-200 text-blue-700 rounded hover:bg-blue-100 text-xs font-medium transition"
+            >
+              Check Email Configuration
+            </button>
+            <p className="text-[10px] text-slate-400 mt-1">Click to verify email service is configured properly.</p>
           </div>
 
           <div className="flex items-center gap-2">
-            <input 
-              type="checkbox" 
-              id="autoSend" 
-              checked={autoSend} 
-              onChange={e => setAutoSend(e.target.checked)} 
-              disabled={!webhookUrl}
+            <input
+              type="checkbox"
+              id="emailEnabled"
+              checked={emailEnabled}
+              onChange={e => setEmailEnabled(e.target.checked)}
               className="rounded text-primary"
             />
-            <label htmlFor="autoSend" className={`text-xs font-semibold ${!webhookUrl ? 'text-gray-400' : 'text-slate-700'}`}>
-              Auto-Send via Webhook when scheduled
+            <label htmlFor="emailEnabled" className="text-xs font-semibold text-slate-700">
+              Enable Email Notifications
             </label>
           </div>
+
+          <div className="flex items-center gap-2 mt-2">
+            <input
+              type="checkbox"
+              id="autoSend"
+              checked={autoSend}
+              onChange={e => setAutoSend(e.target.checked)}
+              disabled={!emailEnabled}
+              className="rounded text-primary"
+            />
+            <label htmlFor="autoSend" className={`text-xs font-semibold ${!emailEnabled ? 'text-gray-400' : 'text-slate-700'}`}>
+              Auto-Send via Email when scheduled (runs on server, no tab needed)
+            </label>
+          </div>
+
+          {isEnabled && autoSend && emailEnabled && (
+            <div className="mt-3 p-2 bg-blue-50 border border-blue-200 rounded text-xs text-blue-700">
+              <strong>📡 Background Mode Active:</strong> Emails will be sent automatically at {scheduledTime} every day, even when your browser is closed. The server handles everything!
+            </div>
+          )}
         </div>
       )}
 
@@ -186,8 +363,8 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({ balances
       <div className="flex flex-col gap-4 mb-6">
         <div className="flex items-center gap-4 bg-gray-50 p-3 rounded-lg border border-gray-200">
           <div className="flex-1">
-             <span className="text-xs text-gray-500 block">Scheduled Time</span>
-             <input
+            <span className="text-xs text-gray-500 block">Scheduled Time</span>
+            <input
               type="time"
               value={scheduledTime}
               onChange={(e) => setScheduledTime(e.target.value)}
@@ -220,12 +397,12 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({ balances
       {/* Generated Reminders List */}
       <div className="flex-1 overflow-y-auto pr-1">
         <div className="flex justify-between items-center mb-2">
-           <h3 className="text-xs font-bold text-gray-500 uppercase">Draft Messages</h3>
-           {reminders.length > 0 && webhookUrl && (
-             <button onClick={() => handleBatchSend(reminders)} className="text-[10px] text-primary hover:underline">Send All</button>
-           )}
+          <h3 className="text-xs font-bold text-gray-500 uppercase">Draft Messages</h3>
+          {reminders.length > 0 && emailEnabled && (
+            <button onClick={() => handleBatchSend(reminders)} className="text-[10px] text-primary hover:underline">Send All</button>
+          )}
         </div>
-        
+
         {reminders.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-40 text-gray-400 bg-gray-50 rounded-xl border border-dashed border-gray-200">
             <p className="text-sm">No pending reminders.</p>
@@ -238,27 +415,27 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({ balances
               return (
                 <div key={idx} className="flex flex-col gap-2 p-3 border border-gray-200 rounded-xl hover:shadow-md transition bg-white group">
                   <div className="flex justify-between items-center">
-                      <div className="flex items-center gap-2">
-                        <span className="font-bold text-gray-800 text-sm">{reminder.name}</span>
-                        {status === 'sent' && <span className="text-[10px] bg-green-100 text-green-600 px-1.5 py-0.5 rounded">Sent</span>}
-                        {status === 'error' && <span className="text-[10px] bg-red-100 text-red-600 px-1.5 py-0.5 rounded">Error</span>}
-                      </div>
-                      <span className="text-red-500 font-bold text-xs bg-red-50 px-2 py-1 rounded border border-red-100">
-                        {reminder.amountOwed && reminder.amountOwed > 0 ? `Owes $${reminder.amountOwed.toFixed(0)}` : 'Low Funds'}
-                      </span>
+                    <div className="flex items-center gap-2">
+                      <span className="font-bold text-gray-800 text-sm">{reminder.name}</span>
+                      {status === 'sent' && <span className="text-[10px] bg-green-100 text-green-600 px-1.5 py-0.5 rounded">Sent</span>}
+                      {status === 'error' && <span className="text-[10px] bg-red-100 text-red-600 px-1.5 py-0.5 rounded">Error</span>}
+                    </div>
+                    <span className="text-red-500 font-bold text-xs bg-red-50 px-2 py-1 rounded border border-red-100">
+                      {reminder.amountOwed && reminder.amountOwed > 0 ? `Owes $${reminder.amountOwed.toFixed(0)}` : 'Low Funds'}
+                    </span>
                   </div>
                   <div className="relative">
                     <div className="p-2.5 bg-indigo-50 text-indigo-900 rounded-lg text-xs leading-relaxed">
                       "{reminder.message}"
                     </div>
                   </div>
-                  <button 
-                      onClick={() => reminder.personId && handleSend(reminder)}
-                      className="w-full mt-1 py-1.5 bg-white border border-gray-300 text-gray-700 text-xs font-medium rounded hover:bg-gray-50 hover:text-gray-900 transition flex items-center justify-center gap-1"
-                    >
-                      {webhookUrl ? 'Send via Webhook' : 'Simulate Send'}
-                      <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" /></svg>
-                    </button>
+                  <button
+                    onClick={() => reminder.personId && handleSend(reminder)}
+                    className="w-full mt-1 py-1.5 bg-white border border-gray-300 text-gray-700 text-xs font-medium rounded hover:bg-gray-50 hover:text-gray-900 transition flex items-center justify-center gap-1"
+                  >
+                    {emailEnabled ? 'Send via Email' : 'Simulate Send'}
+                    <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" /></svg>
+                  </button>
                 </div>
               );
             })}

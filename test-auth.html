@@ -1,0 +1,258 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>MealShare Auth Test</title>
+    <style>
+      body {
+        font-family: Arial, sans-serif;
+        max-width: 800px;
+        margin: 50px auto;
+        padding: 20px;
+      }
+      .test-section {
+        border: 1px solid #ddd;
+        padding: 20px;
+        margin: 20px 0;
+        border-radius: 8px;
+      }
+      .success {
+        color: green;
+      }
+      .error {
+        color: red;
+      }
+      .info {
+        color: blue;
+      }
+      button {
+        background: #4f46e5;
+        color: white;
+        padding: 10px 20px;
+        border: none;
+        border-radius: 5px;
+        cursor: pointer;
+        margin: 5px;
+      }
+      button:hover {
+        background: #4338ca;
+      }
+      pre {
+        background: #f5f5f5;
+        padding: 10px;
+        border-radius: 5px;
+        overflow-x: auto;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>🔍 MealShare Authentication & API Test</h1>
+
+    <div class="test-section">
+      <h2>1. Check Authentication Status</h2>
+      <button onclick="checkAuth()">Check Auth</button>
+      <div id="auth-result"></div>
+    </div>
+
+    <div class="test-section">
+      <h2>2. Test Email Status API</h2>
+      <button onclick="testEmailStatus()">Test Email Status</button>
+      <div id="email-status-result"></div>
+    </div>
+
+    <div class="test-section">
+      <h2>3. Test Sheet Config API</h2>
+      <button onclick="testSheetConfig()">Get Sheet Config</button>
+      <button onclick="saveSheetConfig()">Save Test Config</button>
+      <div id="sheet-config-result"></div>
+    </div>
+
+    <div class="test-section">
+      <h2>4. Test Send Email API</h2>
+      <input
+        type="text"
+        id="test-email"
+        placeholder="Recipient name"
+        value="Test User"
+      />
+      <button onclick="testSendEmail()">Test Send Email</button>
+      <div id="send-email-result"></div>
+    </div>
+
+    <div class="test-section">
+      <h2>5. Login with Google</h2>
+      <button onclick="loginGoogle()">Login with Google</button>
+      <button onclick="logout()">Logout</button>
+    </div>
+
+    <script>
+      const API_URL = "http://localhost:5000";
+
+      async function checkAuth() {
+        const result = document.getElementById("auth-result");
+        result.innerHTML = '<p class="info">Checking...</p>';
+
+        try {
+          const response = await fetch(`${API_URL}/auth/user`, {
+            credentials: "include",
+          });
+
+          const data = await response.json();
+
+          if (response.ok && data.user) {
+            result.innerHTML = `
+                        <p class="success">✅ Authenticated!</p>
+                        <pre>${JSON.stringify(data.user, null, 2)}</pre>
+                    `;
+          } else {
+            result.innerHTML = '<p class="error">❌ Not authenticated</p>';
+          }
+        } catch (error) {
+          result.innerHTML = `<p class="error">❌ Error: ${error.message}</p>`;
+        }
+      }
+
+      async function testEmailStatus() {
+        const result = document.getElementById("email-status-result");
+        result.innerHTML = '<p class="info">Checking email service...</p>';
+
+        try {
+          const response = await fetch(
+            `${API_URL}/api/notifications/email-status`,
+            {
+              credentials: "include",
+            }
+          );
+
+          if (response.status === 401) {
+            result.innerHTML =
+              '<p class="error">❌ 401 Unauthorized - You need to login first</p>';
+            return;
+          }
+
+          const data = await response.json();
+          result.innerHTML = `
+                    <p class="success">✅ API Response:</p>
+                    <pre>${JSON.stringify(data, null, 2)}</pre>
+                `;
+        } catch (error) {
+          result.innerHTML = `<p class="error">❌ Error: ${error.message}</p>`;
+        }
+      }
+
+      async function testSheetConfig() {
+        const result = document.getElementById("sheet-config-result");
+        result.innerHTML = '<p class="info">Getting sheet config...</p>';
+
+        try {
+          const response = await fetch(`${API_URL}/api/sheet/config`, {
+            credentials: "include",
+          });
+
+          if (response.status === 401) {
+            result.innerHTML =
+              '<p class="error">❌ 401 Unauthorized - You need to login first</p>';
+            return;
+          }
+
+          const data = await response.json();
+          result.innerHTML = `
+                    <p class="success">✅ Config Retrieved:</p>
+                    <pre>${JSON.stringify(data, null, 2)}</pre>
+                `;
+        } catch (error) {
+          result.innerHTML = `<p class="error">❌ Error: ${error.message}</p>`;
+        }
+      }
+
+      async function saveSheetConfig() {
+        const result = document.getElementById("sheet-config-result");
+        result.innerHTML = '<p class="info">Saving test config...</p>';
+
+        try {
+          const response = await fetch(`${API_URL}/api/sheet/config`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            credentials: "include",
+            body: JSON.stringify({
+              csvUrl: "https://docs.google.com/test/csv",
+            }),
+          });
+
+          if (response.status === 401) {
+            result.innerHTML =
+              '<p class="error">❌ 401 Unauthorized - You need to login first</p>';
+            return;
+          }
+
+          const data = await response.json();
+          result.innerHTML = `
+                    <p class="success">✅ Config Saved:</p>
+                    <pre>${JSON.stringify(data, null, 2)}</pre>
+                `;
+        } catch (error) {
+          result.innerHTML = `<p class="error">❌ Error: ${error.message}</p>`;
+        }
+      }
+
+      async function testSendEmail() {
+        const result = document.getElementById("send-email-result");
+        const name = document.getElementById("test-email").value;
+        result.innerHTML = '<p class="info">Sending test email...</p>';
+
+        try {
+          const response = await fetch(
+            `${API_URL}/api/notifications/send-email`,
+            {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              credentials: "include",
+              body: JSON.stringify({
+                name: name,
+                message:
+                  "This is a test message from the authentication test page.",
+                amountOwed: 100,
+              }),
+            }
+          );
+
+          if (response.status === 401) {
+            result.innerHTML =
+              '<p class="error">❌ 401 Unauthorized - You need to login first</p>';
+            return;
+          }
+
+          const data = await response.json();
+
+          if (data.success) {
+            result.innerHTML = `<p class="success">✅ ${data.message}</p>`;
+          } else {
+            result.innerHTML = `<p class="error">❌ ${data.error}</p>`;
+          }
+        } catch (error) {
+          result.innerHTML = `<p class="error">❌ Error: ${error.message}</p>`;
+        }
+      }
+
+      function loginGoogle() {
+        window.location.href = `${API_URL}/auth/google`;
+      }
+
+      async function logout() {
+        try {
+          await fetch(`${API_URL}/auth/logout`, {
+            method: "POST",
+            credentials: "include",
+          });
+          alert("Logged out! Refresh the page and check auth status.");
+        } catch (error) {
+          alert("Logout error: " + error.message);
+        }
+      }
+
+      // Auto-check auth on page load
+      window.onload = () => {
+        checkAuth();
+      };
+    </script>
+  </body>
+</html>
