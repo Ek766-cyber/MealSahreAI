@@ -23,11 +23,11 @@
 Your current `.env` configuration:
 
 ```env
-EMAIL_HOST=smtp.gmail.com
-EMAIL_PORT=587
-EMAIL_SECURE=false
-EMAIL_USER=emon122734@gmail.com
-EMAIL_PASSWORD=jidsvzgpurdupzre
+EMAIL_HOST=
+EMAIL_PORT=
+EMAIL_SECURE=
+EMAIL_USER=
+EMAIL_PASSWORD=
 ```
 
 ### How to Generate Gmail App Password
