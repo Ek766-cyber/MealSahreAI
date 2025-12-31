@@ -16,8 +16,9 @@ router.get('/google', passport.authenticate('google', {
 router.get('/google/callback',
   passport.authenticate('google', { failureRedirect: '/login' }),
   (req: Request, res: Response) => {
-    // Successful authentication
-    res.redirect(process.env.CLIENT_URL || 'http://localhost:5173');
+    // Successful authentication - redirect to dashboard
+    const clientUrl = process.env.CLIENT_URL || 'http://localhost:5173';
+    res.redirect(`${clientUrl}/dashboard`);
   }
 );
 
