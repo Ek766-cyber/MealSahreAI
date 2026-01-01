@@ -53,13 +53,38 @@ app.use(session({
 app.use(passport.initialize());
 app.use(passport.session());
 
+// Root health check (for /.netlify/functions/server)
+app.get('/', (req, res) => {
+  res.json({ 
+    status: 'ok', 
+    message: 'MealShare API is running on Netlify',
+    timestamp: new Date().toISOString(),
+    env: {
+      nodeEnv: process.env.NODE_ENV,
+      hasClientUrl: !!process.env.CLIENT_URL,
+      hasGoogleClientId: !!process.env.GOOGLE_CLIENT_ID
+    }
+  });
+});
+
+// Debug route
+app.get('/debug', (req, res) => {
+  res.json({
+    path: req.path,
+    originalUrl: req.originalUrl,
+    baseUrl: req.baseUrl,
+    headers: req.headers,
+    query: req.query
+  });
+});
+
 // Routes
 app.use('/auth', authRoutes);
 app.use('/api/members', memberRoutes);
 app.use('/api/notifications', notificationRoutes);
 app.use('/api/sheet', sheetRoutes);
 
-// Health check
+// Health check (for backward compatibility)
 app.get('/health', (req, res) => {
   res.json({ 
     status: 'ok', 
