@@ -81,7 +81,8 @@ app.get('/', (req, res) => {
     env: {
       nodeEnv: process.env.NODE_ENV,
       hasClientUrl: !!process.env.CLIENT_URL,
-      hasGoogleClientId: !!process.env.GOOGLE_CLIENT_ID
+      hasGoogleClientId: !!process.env.GOOGLE_CLIENT_ID,
+      hasMongoUri: !!process.env.MONGODB_URI
     }
   });
 });
@@ -90,18 +91,18 @@ app.get('/', (req, res) => {
 app.get('/debug', (req, res) => {
   res.json({
     path: req.path,
-// Routes - will be loaded after initialization
-app.use('/auth', (req, res, next) => {
-  if (authRoutes) authRoutes(req, res, next);
-  else res.status(503).json({ error: 'Routes not initialized' });
+    originalUrl: req.originalUrl,
+    baseUrl: req.baseUrl,
+    headers: req.headers,
+    query: req.query
+  });
 });
 
-app.use('/api/members', (req, res, next) => {
 // Routes
 app.use('/auth', authRoutes);
 app.use('/api/members', memberRoutes);
 app.use('/api/notifications', notificationRoutes);
-app.use('/api/sheet', sheetRoutes);.use('/api/sheet', sheetRoutes);
+app.use('/api/sheet', sheetRoutes);
 
 // Health check (for backward compatibility)
 app.get('/health', (req, res) => {
