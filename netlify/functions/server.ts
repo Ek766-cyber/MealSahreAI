@@ -3,6 +3,11 @@ import express from 'express';
 import session from 'express-session';
 import cors from 'cors';
 import dotenv from 'dotenv';
+
+// Load environment variables first
+dotenv.config();
+
+// Import configurations and routes
 import passport from '../../server/config/passport.js';
 import { connectDB } from '../../server/config/database.js';
 import authRoutes from '../../server/routes/auth.js';
@@ -10,42 +15,50 @@ import memberRoutes from '../../server/routes/members.js';
 import notificationRoutes from '../../server/routes/notifications.js';
 import sheetRoutes from '../../server/routes/sheet.js';
 
-// Load environment variables
-dotenv.config();
-
 const app = express();
 
 // Connect to MongoDB (with connection pooling for serverless)
 let dbConnection: any = null;
 const getDB = async () => {
   if (!dbConnection) {
-    dbConnection = await connectDB();
+    try {
+      dbConnection = await connectDB();
+      console.log('MongoDB connected successfully');
+    } catch (error) {
+      console.error('MongoDB connection error:', error);
+      throw error;
+    }
   }
   return dbConnection;
 };
 
-// Initialize DB connection
-getDB();
+// Initialize DB connection on cold start
+getDB().catch(err => {
+  console.error('Failed to initialize database:', err);
+});
 
 // Middleware
 app.use(cors({
   origin: process.env.CLIENT_URL || process.env.URL || '*',
-  credentials: true
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization']
 }));
 
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// Session configuration
+// Session configuration for serverless
 app.use(session({
-  secret: process.env.SESSION_SECRET || 'your-secret-key-change-in-production',
+  secret: process.env.SESSION_SECRET || 'fallback-secret-change-in-production',
   resave: false,
   saveUninitialized: false,
   cookie: {
     maxAge: 24 * 60 * 60 * 1000, // 24 hours
     httpOnly: true,
     secure: process.env.NODE_ENV === 'production',
-    sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax'
+    sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
+    path: '/'
   }
 }));
 
@@ -95,9 +108,21 @@ app.get('/health', (req, res) => {
 
 // Error handling middleware
 app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
-  console.error(err.stack);
-  res.status(500).json({ error: 'Something went wrong!' });
+  console.error('Error occurred:', {
+    message: err.message,
+    stack: err.stack,
+    path: req.path,
+    method: req.method
+  });
+  res.status(err.status || 500).json({ 
+    error: err.message || 'Internal server error',
+    path: req.path
+  });
 });
 
-// Export as serverless function
-export const handler = serverless(app);
+// Wrap with serverless-http with proper configuration
+const handler = serverless(app, {
+  basePath: '/.netlify/functions/server'
+});
+
+export { handler };

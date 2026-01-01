@@ -7,9 +7,14 @@ export const connectDB = async () => {
     await mongoose.connect(mongoURI);
     
     console.log('✅ MongoDB Connected Successfully');
+    return mongoose.connection;
   } catch (error) {
     console.error('❌ MongoDB Connection Error:', error);
-    process.exit(1);
+    // Don't exit in serverless environment - just throw the error
+    if (process.env.NODE_ENV !== 'production') {
+      process.exit(1);
+    }
+    throw error;
   }
 };
 
