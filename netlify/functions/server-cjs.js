@@ -171,6 +171,17 @@ app.get("/", (req, res) => {
   });
 });
 
+// Debug route
+app.get("/debug", (req, res) => {
+  res.json({
+    path: req.path,
+    originalUrl: req.originalUrl,
+    baseUrl: req.baseUrl,
+    url: req.url,
+    method: req.method,
+  });
+});
+
 // Auth routes
 app.get(
   "/auth/google",
@@ -202,6 +213,17 @@ app.post("/auth/logout", (req, res) => {
       return res.status(500).json({ error: "Logout failed" });
     }
     res.json({ message: "Logged out successfully" });
+  });
+});
+
+// Catch-all route for debugging
+app.use((req, res, next) => {
+  console.log("Unmatched route:", req.method, req.path);
+  res.status(404).json({
+    error: "Not Found",
+    path: req.path,
+    method: req.method,
+    message: "This route does not exist on the server",
   });
 });
 
