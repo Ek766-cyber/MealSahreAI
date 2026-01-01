@@ -248,5 +248,5 @@ app.use((err, req, res, next) => {
 
 // Export handler with basePath to strip Netlify function path
 exports.handler = serverless(app, {
-  basePath: '/.netlify/functions/server-cjs'
+  basePath: "/.netlify/functions/server-cjs",
 });
