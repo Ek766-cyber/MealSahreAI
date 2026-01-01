@@ -25,7 +25,7 @@ const App: React.FC = () => {
   useEffect(() => {
     const checkAuth = async () => {
       try {
-        const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+        const API_URL = import.meta.env.VITE_API_URL || '/.netlify/functions/server';
         const response = await fetch(`${API_URL}/auth/user`, {
           credentials: 'include'
         });
@@ -70,7 +70,8 @@ const App: React.FC = () => {
   // Load synced data from database
   const loadSyncedData = async () => {
     try {
-      const response = await fetch('http://localhost:5000/api/sheet/config', {
+      const API_URL = import.meta.env.VITE_API_URL || '/.netlify/functions/server';
+      const response = await fetch(`${API_URL}/api/sheet/config`, {
         credentials: 'include'
       });
 
@@ -100,7 +101,7 @@ const App: React.FC = () => {
 
   const handleLogout = async () => {
     try {
-      const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+      const API_URL = import.meta.env.VITE_API_URL || '/.netlify/functions/server';
       await fetch(`${API_URL}/auth/logout`, {
         method: 'POST',
         credentials: 'include'
@@ -187,7 +188,8 @@ const App: React.FC = () => {
 
         // 4. Save synced data to database
         try {
-          const saveResponse = await fetch('http://localhost:5000/api/sheet/save-data', {
+          const API_URL = import.meta.env.VITE_API_URL || '/.netlify/functions/server';
+          const saveResponse = await fetch(`${API_URL}/api/sheet/save-data`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             credentials: 'include',
