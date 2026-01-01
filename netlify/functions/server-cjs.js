@@ -41,7 +41,7 @@ async function connectDB() {
       tls: true,
       tlsAllowInvalidCertificates: false,
       retryWrites: true,
-      w: 'majority'
+      w: "majority",
     });
 
     cachedConnection = connection;
