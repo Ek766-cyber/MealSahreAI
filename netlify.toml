@@ -4,9 +4,8 @@
   functions = "netlify/functions"
 
 [functions]
-  # Use nft bundler which handles ES modules better
-  node_bundler = "nft"
-  included_files = ["server/**/*.js", "server/**/*.ts"]
+  # Use esbuild to bundle everything properly
+  node_bundler = "esbuild"
 
 [dev]
   command = "npm run dev"
@@ -16,12 +15,12 @@
 
 [[redirects]]
   from = "/auth/*"
-  to = "/.netlify/functions/server/:splat"
+  to = "/.netlify/functions/server-cjs/:splat"
   status = 200
 
 [[redirects]]
   from = "/api/*"
-  to = "/.netlify/functions/server/:splat"
+  to = "/.netlify/functions/server-cjs/:splat"
   status = 200
 
 [[redirects]]

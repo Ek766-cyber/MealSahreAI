@@ -5,7 +5,7 @@ interface LoginProps {
   onLogin: (user: User) => void;
 }
 
-const API_URL = import.meta.env.VITE_API_URL || '/.netlify/functions/server';
+const API_URL = import.meta.env.VITE_API_URL || '/.netlify/functions/server-cjs';
 
 export const Login: React.FC<LoginProps> = ({ onLogin }) => {
   const [isLoading, setIsLoading] = useState(false);

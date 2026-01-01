@@ -25,7 +25,7 @@ const App: React.FC = () => {
   useEffect(() => {
     const checkAuth = async () => {
       try {
-        const API_URL = import.meta.env.VITE_API_URL || '/.netlify/functions/server';
+        const API_URL = import.meta.env.VITE_API_URL || '/.netlify/functions/server-cjs';
         const response = await fetch(`${API_URL}/auth/user`, {
           credentials: 'include'
         });
@@ -70,7 +70,7 @@ const App: React.FC = () => {
   // Load synced data from database
   const loadSyncedData = async () => {
     try {
-      const API_URL = import.meta.env.VITE_API_URL || '/.netlify/functions/server';
+      const API_URL = import.meta.env.VITE_API_URL || '/.netlify/functions/server-cjs';
       const response = await fetch(`${API_URL}/api/sheet/config`, {
         credentials: 'include'
       });
@@ -101,7 +101,7 @@ const App: React.FC = () => {
 
   const handleLogout = async () => {
     try {
-      const API_URL = import.meta.env.VITE_API_URL || '/.netlify/functions/server';
+      const API_URL = import.meta.env.VITE_API_URL || '/.netlify/functions/server-cjs';
       await fetch(`${API_URL}/auth/logout`, {
         method: 'POST',
         credentials: 'include'
