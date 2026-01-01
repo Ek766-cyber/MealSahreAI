@@ -32,16 +32,12 @@ async function connectDB() {
 
     mongoose.set("strictQuery", false);
 
+    // Simpler connection options for serverless compatibility
     const connection = await mongoose.connect(mongoURI, {
-      serverSelectionTimeoutMS: 5000,
+      serverSelectionTimeoutMS: 10000,
+      connectTimeoutMS: 10000,
       socketTimeoutMS: 45000,
-      maxPoolSize: 10,
-      minPoolSize: 1,
-      maxIdleTimeMS: 10000,
-      tls: true,
-      tlsAllowInvalidCertificates: false,
-      retryWrites: true,
-      w: "majority",
+      family: 4, // Use IPv4, skip trying IPv6
     });
 
     cachedConnection = connection;

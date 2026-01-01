@@ -23,15 +23,10 @@ export const connectDB = async () => {
     mongoose.set('strictQuery', false);
     
     const connection = await mongoose.connect(mongoURI, {
-      serverSelectionTimeoutMS: 5000, // Timeout after 5s instead of 30s
+      serverSelectionTimeoutMS: 10000,
+      connectTimeoutMS: 10000,
       socketTimeoutMS: 45000,
-      maxPoolSize: 10, // Maintain up to 10 connections
-      minPoolSize: 1,
-      maxIdleTimeMS: 10000,
-      tls: true,
-      tlsAllowInvalidCertificates: false,
-      retryWrites: true,
-      w: 'majority'
+      family: 4 // Use IPv4, skip trying IPv6
     });
     
     cachedConnection = connection;
