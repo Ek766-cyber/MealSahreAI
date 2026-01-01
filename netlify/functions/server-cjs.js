@@ -246,17 +246,7 @@ app.use((err, req, res, next) => {
   });
 });
 
-// Export handler with binary support and base path stripping
+// Export handler with basePath to strip Netlify function path
 exports.handler = serverless(app, {
-  binary: ['image/*', 'application/pdf'],
-  request: (request) => {
-    // Strip the base path from the URL
-    if (request.path && request.path.startsWith('/.netlify/functions/server-cjs')) {
-      request.path = request.path.replace('/.netlify/functions/server-cjs', '');
-    }
-    if (!request.path || request.path === '') {
-      request.path = '/';
-    }
-    return request;
-  }
+  basePath: '/.netlify/functions/server-cjs'
 });
