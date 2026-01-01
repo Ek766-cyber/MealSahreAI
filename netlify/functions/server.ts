@@ -3,12 +3,12 @@ import express from 'express';
 import session from 'express-session';
 import cors from 'cors';
 import dotenv from 'dotenv';
-import passport from '../../server/config/passport';
-import { connectDB } from '../../server/config/database';
-import authRoutes from '../../server/routes/auth';
-import memberRoutes from '../../server/routes/members';
-import notificationRoutes from '../../server/routes/notifications';
-import sheetRoutes from '../../server/routes/sheet';
+import passport from '../../server/config/passport.js';
+import { connectDB } from '../../server/config/database.js';
+import authRoutes from '../../server/routes/auth.js';
+import memberRoutes from '../../server/routes/members.js';
+import notificationRoutes from '../../server/routes/notifications.js';
+import sheetRoutes from '../../server/routes/sheet.js';
 
 // Load environment variables first
 dotenv.config();

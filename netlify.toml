@@ -4,9 +4,9 @@
   functions = "netlify/functions"
 
 [functions]
-  node_bundler = "esbuild"
-  external_node_modules = ["mongoose", "express", "passport"]
-  included_files = ["server/**/*"]
+  # Use nft bundler which handles ES modules better
+  node_bundler = "nft"
+  included_files = ["server/**/*.js", "server/**/*.ts"]
 
 [dev]
   command = "npm run dev"
