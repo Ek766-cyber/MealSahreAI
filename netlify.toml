@@ -5,6 +5,7 @@
 
 [functions]
   node_bundler = "esbuild"
+  external_node_modules = ["mongoose", "express", "passport"]
   included_files = ["server/**/*"]
 
 [dev]

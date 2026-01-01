@@ -3,30 +3,42 @@ import express from 'express';
 import session from 'express-session';
 import cors from 'cors';
 import dotenv from 'dotenv';
+import passport from '../../server/config/passport';
+import { connectDB } from '../../server/config/database';
+import authRoutes from '../../server/routes/auth';
+import memberRoutes from '../../server/routes/members';
+import notificationRoutes from '../../server/routes/notifications';
+import sheetRoutes from '../../server/routes/sheet';
 
 // Load environment variables first
 dotenv.config();
 
-// Import configurations and routes
-import passport from '../../server/config/passport.js';
-import { connectDB } from '../../server/config/database.js';
-import authRoutes from '../../server/routes/auth.js';
-import memberRoutes from '../../server/routes/members.js';
-import notificationRoutes from '../../server/routes/notifications.js';
-import sheetRoutes from '../../server/routes/sheet.js';
-
 const app = express();
 
-// Middleware to ensure DB connection before handling requests
+// Connect to MongoDB on cold start
+let dbConnected = false;
+const ensureDB = async () => {
+  if (!dbConnected) {
+    try {
+      await connectDB();
+      dbConnected = true;
+      console.log('✅ Database connected');
+    } catch (error) {
+      console.error('❌ Database connection failed:', error);
+      throw error;
+    }
+  }
+};
+
+// Middleware to ensure DB connection
 app.use(async (req, res, next) => {
   try {
-    await connectDB();
+    await ensureDB();
     next();
   } catch (error) {
-    console.error('Database connection failed:', error);
     res.status(503).json({ 
-      error: 'Database connection failed', 
-      message: 'Please check if MONGODB_URI is set in environment variables'
+      error: 'Database unavailable',
+      message: error instanceof Error ? error.message : 'Unknown error'
     });
   }
 });
@@ -78,18 +90,18 @@ app.get('/', (req, res) => {
 app.get('/debug', (req, res) => {
   res.json({
     path: req.path,
-    originalUrl: req.originalUrl,
-    baseUrl: req.baseUrl,
-    headers: req.headers,
-    query: req.query
-  });
+// Routes - will be loaded after initialization
+app.use('/auth', (req, res, next) => {
+  if (authRoutes) authRoutes(req, res, next);
+  else res.status(503).json({ error: 'Routes not initialized' });
 });
 
+app.use('/api/members', (req, res, next) => {
 // Routes
 app.use('/auth', authRoutes);
 app.use('/api/members', memberRoutes);
 app.use('/api/notifications', notificationRoutes);
-app.use('/api/sheet', sheetRoutes);
+app.use('/api/sheet', sheetRoutes);.use('/api/sheet', sheetRoutes);
 
 // Health check (for backward compatibility)
 app.get('/health', (req, res) => {
