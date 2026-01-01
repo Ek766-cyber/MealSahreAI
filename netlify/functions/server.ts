@@ -17,24 +17,18 @@ import sheetRoutes from '../../server/routes/sheet.js';
 
 const app = express();
 
-// Connect to MongoDB (with connection pooling for serverless)
-let dbConnection: any = null;
-const getDB = async () => {
-  if (!dbConnection) {
-    try {
-      dbConnection = await connectDB();
-      console.log('MongoDB connected successfully');
-    } catch (error) {
-      console.error('MongoDB connection error:', error);
-      throw error;
-    }
+// Middleware to ensure DB connection before handling requests
+app.use(async (req, res, next) => {
+  try {
+    await connectDB();
+    next();
+  } catch (error) {
+    console.error('Database connection failed:', error);
+    res.status(503).json({ 
+      error: 'Database connection failed', 
+      message: 'Please check if MONGODB_URI is set in environment variables'
+    });
   }
-  return dbConnection;
-};
-
-// Initialize DB connection on cold start
-getDB().catch(err => {
-  console.error('Failed to initialize database:', err);
 });
 
 // Middleware
