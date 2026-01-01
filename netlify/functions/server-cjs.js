@@ -183,17 +183,21 @@ app.get("/debug", (req, res) => {
 });
 
 // Auth routes
-app.get(
-  "/auth/google",
+app.get("/auth/google", (req, res, next) => {
+  console.log("Google auth route hit");
   passport.authenticate("google", {
     scope: ["profile", "email"],
-  })
-);
+  })(req, res, next);
+});
 
 app.get(
   "/auth/google/callback",
-  passport.authenticate("google", { failureRedirect: "/login" }),
+  (req, res, next) => {
+    console.log("Google callback route hit");
+    passport.authenticate("google", { failureRedirect: "/" })(req, res, next);
+  },
   (req, res) => {
+    console.log("Auth successful, redirecting...");
     const clientUrl = process.env.CLIENT_URL || "http://localhost:5173";
     res.redirect(`${clientUrl}/dashboard`);
   }
