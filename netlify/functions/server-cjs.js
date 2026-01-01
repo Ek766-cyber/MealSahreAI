@@ -158,6 +158,13 @@ app.use(
 app.use(passport.initialize());
 app.use(passport.session());
 
+// Add logging middleware
+app.use((req, res, next) => {
+  console.log(`Incoming request: ${req.method} ${req.path}`);
+  console.log(`Original URL: ${req.originalUrl}`);
+  next();
+});
+
 // Routes
 app.get("/", (req, res) => {
   res.json({
