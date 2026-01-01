@@ -38,6 +38,10 @@ async function connectDB() {
       maxPoolSize: 10,
       minPoolSize: 1,
       maxIdleTimeMS: 10000,
+      tls: true,
+      tlsAllowInvalidCertificates: false,
+      retryWrites: true,
+      w: 'majority'
     });
 
     cachedConnection = connection;

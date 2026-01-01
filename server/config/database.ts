@@ -27,7 +27,11 @@ export const connectDB = async () => {
       socketTimeoutMS: 45000,
       maxPoolSize: 10, // Maintain up to 10 connections
       minPoolSize: 1,
-      maxIdleTimeMS: 10000
+      maxIdleTimeMS: 10000,
+      tls: true,
+      tlsAllowInvalidCertificates: false,
+      retryWrites: true,
+      w: 'majority'
     });
     
     cachedConnection = connection;
