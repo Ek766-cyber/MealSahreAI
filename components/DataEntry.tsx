@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Person, Balance } from '../types';
+import { getApiUrl } from '../config/api';
 
 interface DataEntryProps {
   people: Person[];
@@ -30,7 +31,8 @@ export const DataEntry: React.FC<DataEntryProps> = ({
   useEffect(() => {
     const loadSheetConfig = async () => {
       try {
-        const response = await fetch('http://localhost:5000/api/sheet/config', {
+        const API_URL = getApiUrl();
+        const response = await fetch(`${API_URL}/api/sheet/config`, {
           credentials: 'include'
         });
 
@@ -78,7 +80,8 @@ export const DataEntry: React.FC<DataEntryProps> = ({
 
     const saveSchedulerSettings = async () => {
       try {
-        const response = await fetch('http://localhost:5000/api/sheet/save-scheduler', {
+        const API_URL = getApiUrl();
+        const response = await fetch(`${API_URL}/api/sheet/save-scheduler`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           credentials: 'include',
@@ -108,7 +111,8 @@ export const DataEntry: React.FC<DataEntryProps> = ({
     if (sheetUrl.trim()) {
       // Save CSV URL to database if it's new or changed
       try {
-        const configResponse = await fetch('http://localhost:5000/api/sheet/config', {
+        const API_URL = getApiUrl();
+        const configResponse = await fetch(`${API_URL}/api/sheet/config`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           credentials: 'include',
@@ -132,7 +136,8 @@ export const DataEntry: React.FC<DataEntryProps> = ({
 
       // Update last fetch time
       try {
-        const timeResponse = await fetch('http://localhost:5000/api/sheet/update-fetch-time', {
+        const API_URL = getApiUrl();
+        const timeResponse = await fetch(`${API_URL}/api/sheet/update-fetch-time`, {
           method: 'POST',
           credentials: 'include'
         });
@@ -154,7 +159,8 @@ export const DataEntry: React.FC<DataEntryProps> = ({
   const handleRefreshData = async () => {
     try {
       console.log('🔄 Refreshing data from database...');
-      const response = await fetch('http://localhost:5000/api/sheet/config', {
+      const API_URL = getApiUrl();
+      const response = await fetch(`${API_URL}/api/sheet/config`, {
         credentials: 'include'
       });
 
@@ -329,7 +335,8 @@ Mil rate,59,,,,,,,,,,,
                   <button
                     onClick={async () => {
                       try {
-                        const response = await fetch('http://localhost:5000/api/sheet/trigger-manual-sync', {
+                        const API_URL = getApiUrl();
+                        const response = await fetch(`${API_URL}/api/sheet/trigger-manual-sync`, {
                           method: 'POST',
                           credentials: 'include'
                         });

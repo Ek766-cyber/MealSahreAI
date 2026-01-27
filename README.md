@@ -36,38 +36,61 @@
 
    ```bash
    yarn install
-   # or
-   npm install
    ```
 
 3. **Configure environment variables**
 
-   Copy `.env.example` to `.env` and fill in your credentials:
+   **Quick Setup (Recommended):**
 
    ```bash
-   cp .env.example .env
+   ./setup-env.sh
    ```
 
-   Edit `.env` with your values:
+   **Manual Setup:**
+
+   ```bash
+   cp .env.example .env.local
+   ```
+
+   Edit `.env.local` with your values:
 
    ```env
+   # API Configuration (for local development)
+   VITE_API_URL=http://localhost:5000
+
+   # Database
+   MONGODB_URI=mongodb://localhost:27017/mealshare
+
+   # Google OAuth
    GOOGLE_CLIENT_ID=your-client-id
    GOOGLE_CLIENT_SECRET=your-client-secret
-   MONGODB_URI=mongodb://localhost:27017/mealshare
+   GOOGLE_CALLBACK_URL=http://localhost:5000/auth/google/callback
+
+   # Other credentials...
    SESSION_SECRET=your-random-secret-key
    ```
 
-4. **Start MongoDB**
+   > 💡 **Important:** The `VITE_API_URL` ensures the frontend connects to the correct backend in both local and deployed environments.
+   >
+   > See [ENVIRONMENT_CONFIG.md](ENVIRONMENT_CONFIG.md) for detailed configuration guide.
+
+4. **Install dependencies**
 
    ```bash
-   # Ubuntu/Debian
-   sudo systemctl start mongodb
-
-   # macOS
-   brew services start mongodb-community
+   yarn install
    ```
 
-5. **Run the application**
+5. **Start MongoDB**
+
+   # macOS
+
+   brew services start mongodb-community
+
+   ```
+
+   ```
+
+6. **Run the application**
 
    **Terminal 1 - Backend:**
 
@@ -81,14 +104,16 @@
    yarn dev
    ```
 
-6. **Open your browser**
+7. **Open your browser**
 
    Navigate to `http://localhost:5173`
 
 ## 📖 Documentation
 
+- **[Environment Configuration](ENVIRONMENT_CONFIG.md)** - 🆕 **Configure for local & deployed environments**
 - **[Setup Guide](SETUP_GUIDE.md)** - Detailed setup instructions
 - **[SSO & MongoDB Complete](SSO_MONGODB_COMPLETE.md)** - Implementation details
+- **[Email & Database Setup](EMAIL_AND_DB_SETUP.md)** - Email service configuration
 - **[Environment Variables](.env.example)** - Configuration template
 
 ## 🛠 Technology Stack

@@ -89,7 +89,7 @@ class SchedulerService {
         await this.runNotificationTask(userId);
       }, {
         scheduled: true,
-        timezone: 'America/New_York' // You can make this configurable per user
+        timezone: 'Asia/Dhaka' // Bangladesh Standard Time (UTC+6)
       });
 
       // Store the job
@@ -137,7 +137,7 @@ class SchedulerService {
         await this.runSyncTask(userId);
       }, {
         scheduled: true,
-        timezone: 'America/New_York'
+        timezone: 'Asia/Dhaka' // Bangladesh Standard Time (UTC+6)
       });
 
       // Store the job
@@ -189,18 +189,42 @@ class SchedulerService {
 
       console.log(`📊 Fetching balances for ${user.email}...`);
 
-      // Fetch fresh data from Google Sheets directly
-      const balances = await this.fetchBalancesFromSheet();
+      // Use synced data from database (should have been synced by sync scheduler)
+      const syncedPeople = user.syncedPeople || [];
       
-      if (!balances || balances.length === 0) {
-        console.warn(`⚠️ No balance data found for ${user.email}`);
+      if (syncedPeople.length === 0) {
+        console.warn(`⚠️ No synced data found for ${user.email}. Run sync first.`);
         return;
       }
 
-      console.log(`✅ Found ${balances.length} balances`);
+      console.log(`✅ Found ${syncedPeople.length} people in synced data`);
 
-      // Get meal rate from the first balance (they all should have the same rate)
-      const mealRate = balances[0]?.mealRate || 50;
+      // Calculate balances from synced people data
+      const totalContribution = syncedPeople.reduce((sum: number, p: any) => sum + (p.contribution || 0), 0);
+      const totalMeals = syncedPeople.reduce((sum: number, p: any) => sum + (p.meals || 0), 0);
+      
+      // Use sheet meal rate if available, otherwise calculate
+      const mealRate = user.sheetMealRate && user.sheetMealRate > 0 
+        ? user.sheetMealRate 
+        : (totalMeals > 0 ? totalContribution / totalMeals : 50);
+
+      console.log(`💰 Meal rate: $${mealRate.toFixed(2)}`);
+
+      // Build balances array for AI reminder generation
+      const balances = syncedPeople.map((person: any) => {
+        const cost = person.meals * mealRate;
+        const balance = person.contribution - cost;
+        
+        return {
+          personId: person.id,
+          name: person.name,
+          meals: person.meals,
+          contribution: person.contribution,
+          cost,
+          balance,
+          status: balance > 1 ? 'OWED' : balance < -1 ? 'OWES' : 'SETTLED'
+        };
+      });
 
       // Generate AI reminders
       console.log(`🤖 Generating reminders with threshold: $${config.threshold}, tone: ${config.tone}`);

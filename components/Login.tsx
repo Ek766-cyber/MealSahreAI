@@ -1,11 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { User } from '../types';
+import { getApiUrl } from '../config/api';
 
 interface LoginProps {
   onLogin: (user: User) => void;
 }
 
-const API_URL = import.meta.env.VITE_API_URL || '/.netlify/functions/server-cjs';
+const API_URL = getApiUrl();
 
 export const Login: React.FC<LoginProps> = ({ onLogin }) => {
   const [isLoading, setIsLoading] = useState(false);

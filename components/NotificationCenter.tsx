@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { generateReminders } from '../services/geminiService';
 import { Balance, Reminder } from '../types';
+import { getApiUrl } from '../config/api';
 
 interface NotificationCenterProps {
   balances: Balance[];
@@ -29,7 +30,8 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({ balances
   useEffect(() => {
     const loadConfig = async () => {
       try {
-        const response = await fetch('http://localhost:5000/api/notifications/config', {
+        const API_URL = getApiUrl();
+        const response = await fetch(`${API_URL}/api/notifications/config`, {
           credentials: 'include'
         });
 
@@ -68,7 +70,8 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({ balances
 
     const saveConfig = async () => {
       try {
-        const response = await fetch('http://localhost:5000/api/notifications/config', {
+        const API_URL = getApiUrl();
+        const response = await fetch(`${API_URL}/api/notifications/config`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           credentials: 'include',
@@ -98,45 +101,9 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({ balances
     saveConfig();
   }, [scheduledTime, threshold, emailEnabled, autoSend, isEnabled, tone, isLoadingConfig]);
 
-  // Scheduler
-  useEffect(() => {
-    if (!isEnabled) return;
-
-    const interval = setInterval(() => {
-      const now = new Date();
-      const currentHours = String(now.getHours()).padStart(2, '0');
-      const currentMinutes = String(now.getMinutes()).padStart(2, '0');
-      const currentTimeStr = `${currentHours}:${currentMinutes}`;
-
-      if (currentTimeStr === scheduledTime && lastRun !== currentTimeStr) {
-        setLastRun(currentTimeStr);
-        runScheduledTask();
-      }
-    }, 5000);
-
-    return () => clearInterval(interval);
-  }, [isEnabled, scheduledTime, lastRun, balances, tone, threshold, emailEnabled, autoSend]);
-
-  const runScheduledTask = async () => {
-    if ("Notification" in window && Notification.permission === "granted") {
-      new Notification("MealShare AI", { body: "Daily meal audit started..." });
-    }
-
-    // 1. Refresh Data
-    onRefreshData();
-
-    // 2. Generate (Wait a bit for React state to settle if needed, or just run)
-    // Ideally we'd await onRefreshData if it was async, but here we proceed optimistically
-    setIsGenerating(true);
-    const results = await generateReminders(balances, tone, mealRate, threshold);
-    setReminders(results);
-    setIsGenerating(false);
-
-    // 3. Auto-Send if configured
-    if (autoSend && emailEnabled && results.length > 0) {
-      handleBatchSend(results);
-    }
-  };
+  // Note: Scheduling is now handled entirely by the backend server
+  // The server will automatically send emails at the scheduled time
+  // even when no browser tabs are open
 
   const handleGenerateReminders = async () => {
     setIsGenerating(true);
@@ -159,7 +126,8 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({ balances
     try {
       console.log('Sending email for:', reminder.name);
 
-      const response = await fetch('http://localhost:5000/api/notifications/send-email', {
+      const API_URL = getApiUrl();
+      const response = await fetch(`${API_URL}/api/notifications/send-email`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
@@ -280,7 +248,8 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({ balances
             <button
               onClick={async () => {
                 try {
-                  const response = await fetch('http://localhost:5000/api/notifications/email-status', {
+                  const API_URL = getApiUrl();
+                  const response = await fetch(`${API_URL}/api/notifications/email-status`, {
                     credentials: 'include'
                   });
 
