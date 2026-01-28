@@ -60,7 +60,7 @@ export const MemberManager: React.FC<MemberManagerProps> = ({ onClose, onDataCha
         {/* Header */}
         <div className="bg-gray-50 px-6 py-4 border-b border-gray-200 flex justify-between items-center">
           <div>
-            <h3 className="text-lg font-bold text-gray-800">Database Member Directory</h3>
+            <h3 className="text-lg font-bold text-gray-800">Add Members Email Address</h3>
             <p className="text-xs text-gray-500">Map Google Sheet names to real email addresses.</p>
           </div>
           <button onClick={onClose} className="text-gray-400 hover:text-gray-600 transition">

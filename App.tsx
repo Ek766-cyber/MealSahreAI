@@ -42,7 +42,6 @@ const App: React.FC = () => {
             };
             setUser(authenticatedUser);
             localStorage.setItem('mealshare_user', JSON.stringify(authenticatedUser));
-            console.log('✅ User authenticated:', data.user.email);
 
             // Load saved synced data after authentication
             loadSyncedData();
@@ -57,7 +56,6 @@ const App: React.FC = () => {
         // Try localStorage as fallback
         const savedUser = localStorage.getItem('mealshare_user');
         if (savedUser) {
-          console.warn('⚠️ Using cached user from localStorage (backend auth check failed)');
           setUser(JSON.parse(savedUser));
           // Still try to load synced data
           loadSyncedData();
@@ -80,11 +78,9 @@ const App: React.FC = () => {
         const data = await response.json();
         if (data.syncedPeople && data.syncedPeople.length > 0) {
           setPeople(data.syncedPeople);
-          console.log(`✅ Loaded ${data.syncedPeople.length} synced people from database`);
         }
         if (data.sheetMealRate !== null && data.sheetMealRate !== undefined) {
           setSheetMealRate(data.sheetMealRate);
-          console.log('✅ Loaded sheet meal rate from database:', data.sheetMealRate);
         }
         if (data.csvUrl) {
           setLastSheetUrl(data.csvUrl);
@@ -202,7 +198,6 @@ const App: React.FC = () => {
 
           if (saveResponse.ok) {
             const saveData = await saveResponse.json();
-            console.log(`✅ Synced data saved to database: ${saveData.peopleCount} people`);
           } else {
             console.warn('⚠️ Failed to save synced data to database');
           }
@@ -312,7 +307,7 @@ const App: React.FC = () => {
             >
               <span className="flex items-center gap-2 font-semibold">
                 <svg className="w-5 h-5 text-slate-400 group-hover:text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4m0 5c0 2.21-3.582 4-8 4s-8-1.79-8-4" /></svg>
-                Manage Database Members
+                Set Member's Email Addresses
               </span>
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /></svg>
             </button>

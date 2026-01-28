@@ -19,7 +19,6 @@ let cachedConnection = null;
 
 async function connectDB() {
   if (cachedConnection && mongoose.connection.readyState === 1) {
-    console.log("✅ Using cached MongoDB connection");
     return cachedConnection;
   }
 
@@ -29,8 +28,6 @@ async function connectDB() {
     if (!mongoURI) {
       throw new Error("MONGODB_URI environment variable is not set");
     }
-
-    console.log("📡 Connecting to MongoDB...");
 
     mongoose.set("strictQuery", false);
 
@@ -43,7 +40,6 @@ async function connectDB() {
     });
 
     cachedConnection = connection;
-    console.log("✅ MongoDB Connected Successfully");
     return connection;
   } catch (error) {
     console.error("❌ MongoDB Connection Error:", error);
@@ -133,7 +129,6 @@ class EmailService {
 
     if (emailConfig.auth.user && emailConfig.auth.pass) {
       this.transporter = nodemailer.createTransport(emailConfig);
-      console.log("✉️  Email service initialized");
     } else {
       console.warn(
         "⚠️  Email credentials not configured. Email service disabled.",
@@ -148,7 +143,6 @@ class EmailService {
 
     try {
       await this.transporter.verify();
-      console.log("✅ Email server connection verified");
       return true;
     } catch (error) {
       console.error("❌ Email server connection failed:", error);
@@ -207,7 +201,6 @@ class EmailService {
       };
 
       await this.transporter.sendMail(mailOptions);
-      console.log(`✅ Email sent to ${to}`);
       return true;
     } catch (error) {
       console.error(`❌ Failed to send email to ${to}:`, error);
@@ -344,20 +337,6 @@ app.use(
 app.use(passport.initialize());
 app.use(passport.session());
 
-// Add logging middleware
-app.use((req, res, next) => {
-  console.log(`Incoming request: ${req.method} ${req.path}`);
-  console.log(`Original URL: ${req.originalUrl}`);
-  console.log(`Has session: ${!!req.session}`);
-  console.log(`Session ID: ${req.sessionID}`);
-  console.log(`Cookies: ${JSON.stringify(req.cookies)}`);
-  console.log(`Authenticated: ${req.isAuthenticated()}`);
-  if (req.user) {
-    console.log(`User: ${req.user.email}`);
-  }
-  next();
-});
-
 // Routes
 app.get("/", (req, res) => {
   res.json({
@@ -384,7 +363,6 @@ app.get("/debug", (req, res) => {
 
 // Auth routes
 app.get("/auth/google", (req, res, next) => {
-  console.log("Google auth route hit");
   passport.authenticate("google", {
     scope: ["profile", "email"],
   })(req, res, next);
@@ -393,19 +371,13 @@ app.get("/auth/google", (req, res, next) => {
 app.get(
   "/auth/google/callback",
   (req, res, next) => {
-    console.log("Google callback route hit");
     passport.authenticate("google", { failureRedirect: "/" })(req, res, next);
   },
   (req, res) => {
-    console.log("Auth successful, session ID:", req.sessionID);
-    console.log("User:", req.user?.email);
-
     // Explicitly save the session before redirecting
     req.session.save((err) => {
       if (err) {
         console.error("Session save error:", err);
-      } else {
-        console.log("Session saved successfully");
       }
 
       const clientUrl = process.env.CLIENT_URL || "http://localhost:5173";
@@ -433,21 +405,10 @@ app.post("/auth/logout", (req, res) => {
 
 // Middleware to check authentication
 const isAuthenticated = (req, res, next) => {
-  console.log("🔐 Auth check:", {
-    authenticated: req.isAuthenticated(),
-    hasUser: !!req.user,
-    hasSession: !!req.session,
-    sessionID: req.sessionID,
-    path: req.path,
-    method: req.method,
-  });
-
   if (req.isAuthenticated()) {
-    console.log("✅ User authenticated:", req.user?.email);
     return next();
   }
 
-  console.log("❌ Authentication failed - no valid session");
   res.status(401).json({ error: "Not authenticated" });
 };
 
@@ -470,13 +431,7 @@ app.post("/api/members", isAuthenticated, async (req, res) => {
     const userId = req.user._id;
     const { sheetName, email, phone } = req.body;
 
-    console.log("📝 Add member request:", { sheetName, email, phone });
-
     if (!sheetName || !email) {
-      console.error("❌ Missing required fields:", {
-        sheetName: !!sheetName,
-        email: !!email,
-      });
       return res
         .status(400)
         .json({ error: "Sheet name and email are required" });
@@ -596,12 +551,7 @@ app.post("/api/sheet/config", isAuthenticated, async (req, res) => {
     const userId = req.user._id;
     const { csvUrl } = req.body;
 
-    console.log("📝 Save CSV URL request:", {
-      csvUrl: csvUrl?.substring(0, 50) + "...",
-    });
-
     if (!csvUrl) {
-      console.error("❌ Missing csvUrl in request body");
       return res.status(400).json({ error: "CSV URL is required" });
     }
 
@@ -609,7 +559,6 @@ app.post("/api/sheet/config", isAuthenticated, async (req, res) => {
     try {
       new URL(csvUrl);
     } catch {
-      console.error("❌ Invalid URL format:", csvUrl);
       return res.status(400).json({ error: "Invalid URL format" });
     }
 
@@ -620,8 +569,6 @@ app.post("/api/sheet/config", isAuthenticated, async (req, res) => {
 
     user.csvUrl = csvUrl;
     await user.save();
-
-    console.log("✅ CSV URL saved successfully");
 
     res.json({
       success: true,
@@ -678,8 +625,6 @@ app.post("/api/sheet/update-fetch-time", isAuthenticated, async (req, res) => {
     user.lastFetchTime = new Date();
     await user.save();
 
-    console.log(`✅ Last fetch time updated for user ${user.email}`);
-
     res.json({
       success: true,
       lastFetchTime: user.lastFetchTime,
@@ -706,8 +651,6 @@ app.post("/api/sheet/save-scheduler", isAuthenticated, async (req, res) => {
     if (autoSyncTime !== undefined) user.autoSyncTime = autoSyncTime;
     await user.save();
 
-    console.log(`✅ Auto-sync settings saved for user ${user.email}`);
-
     res.json({
       success: true,
       message: "Auto-sync settings saved successfully",
@@ -727,13 +670,6 @@ app.post("/api/notifications/send-email", isAuthenticated, async (req, res) => {
   try {
     const { personId, email, name, message, amountOwed } = req.body;
 
-    console.log("📧 Send email request:", {
-      personId,
-      name,
-      email,
-      amountOwed,
-    });
-
     if (!message || !name) {
       return res.status(400).json({
         success: false,
@@ -750,18 +686,12 @@ app.post("/api/notifications/send-email", isAuthenticated, async (req, res) => {
         sheetName: { $regex: new RegExp(`^${name}$`, "i") },
       });
 
-      console.log(
-        "🔍 Member lookup result:",
-        member ? `Found: ${member.email}` : "Not found",
-      );
-
       if (member) {
         recipientEmail = member.email;
       }
     }
 
     if (!recipientEmail) {
-      console.warn(`⚠️ No email found for member: ${name}`);
       return res.status(400).json({
         success: false,
         error: `No email address found for member "${name}". Please add them in Member Manager.`,
@@ -777,8 +707,6 @@ app.post("/api/notifications/send-email", isAuthenticated, async (req, res) => {
       });
     }
 
-    console.log(`📮 Sending email to: ${recipientEmail}`);
-
     const success = await emailService.sendNotificationEmail(
       recipientEmail,
       name,
@@ -787,13 +715,11 @@ app.post("/api/notifications/send-email", isAuthenticated, async (req, res) => {
     );
 
     if (success) {
-      console.log(`✅ Email sent successfully to ${recipientEmail}`);
       res.json({
         success: true,
         message: `Email sent successfully to ${recipientEmail}`,
       });
     } else {
-      console.error(`❌ Failed to send email to ${recipientEmail}`);
       res.status(500).json({
         success: false,
         error: "Failed to send email. Check server logs for details.",
@@ -911,11 +837,6 @@ app.post("/api/notifications/config", isAuthenticated, async (req, res) => {
 
     await user.save();
 
-    console.log(
-      `✅ Notification config saved for user ${user.email}:`,
-      user.notificationConfig,
-    );
-
     res.json({
       success: true,
       message: "Notification configuration saved successfully",
@@ -932,7 +853,6 @@ app.post("/api/notifications/config", isAuthenticated, async (req, res) => {
 
 // Catch-all route for debugging
 app.use((req, res, next) => {
-  console.log("Unmatched route:", req.method, req.path);
   res.status(404).json({
     error: "Not Found",
     path: req.path,

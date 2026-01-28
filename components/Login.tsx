@@ -58,7 +58,7 @@ export const Login: React.FC<LoginProps> = ({ onLogin }) => {
 
         <h2 className="text-2xl font-bold text-gray-800 tracking-tight">Welcome to MealShare</h2>
         <p className="text-sm text-gray-500 mt-2 text-center leading-relaxed">
-          Automated expense tracking and AI reminders for your shared meals.
+          Automated expense tracking and AI reminders for you.
         </p>
 
         <div className="w-full mt-8">

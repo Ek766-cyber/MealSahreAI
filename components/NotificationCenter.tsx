@@ -36,7 +36,6 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({ balances
         });
 
         if (response.status === 401) {
-          console.warn('⚠️ Not authenticated - skipping notification config load');
           setIsLoadingConfig(false);
           return;
         }
@@ -51,7 +50,6 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({ balances
             setAutoSend(config.autoSend || false);
             setIsEnabled(config.isEnabled || false);
             setTone(config.tone || 'friendly');
-            console.log('✅ Loaded notification config:', config);
           }
         }
       } catch (error) {
@@ -86,10 +84,9 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({ balances
         });
 
         if (response.status === 401) {
-          console.warn('⚠️ Not authenticated - notification config not saved');
+          // Not authenticated
         } else if (response.ok) {
           const data = await response.json();
-          console.log('✅ Notification config saved:', data.config);
         } else {
           console.error('Failed to save notification config');
         }
@@ -119,13 +116,10 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({ balances
     if (!emailEnabled) {
       // Silent notification instead of alert
       setSendStatus(prev => ({ ...prev, [reminder.personId!]: 'sent' }));
-      console.log(`[SIMULATION] Email to ${reminder.name}: ${reminder.message}`);
       return;
     }
 
     try {
-      console.log('Sending email for:', reminder.name);
-
       const API_URL = getApiUrl();
       const response = await fetch(`${API_URL}/api/notifications/send-email`, {
         method: 'POST',
@@ -140,17 +134,14 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({ balances
       });
 
       if (response.status === 401) {
-        console.warn('⚠️ Authentication required. Please make sure you are logged in.');
         setSendStatus(prev => ({ ...prev, [reminder.personId!]: 'error' }));
         return;
       }
 
       const data = await response.json();
-      console.log('Email API response:', data);
 
       if (data.success) {
         setSendStatus(prev => ({ ...prev, [reminder.personId!]: 'sent' }));
-        console.log(`✅ Email sent to ${reminder.name}`);
 
         // Silent browser notification instead of alert
         if ("Notification" in window && Notification.permission === "granted") {
@@ -199,7 +190,7 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({ balances
                 </svg>
                 Auto-Send Active
               </span>
-              <span className="text-gray-500">Runs daily at {scheduledTime} (even when tab is closed)</span>
+              <span className="text-gray-500">Runs daily at {scheduledTime}.</span>
             </div>
           )}
         </div>
@@ -243,56 +234,6 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({ balances
             </div>
           </div>
 
-          <div className="mb-4">
-            <label className="block text-xs font-semibold text-slate-500 mb-1">Email Service</label>
-            <button
-              onClick={async () => {
-                try {
-                  const API_URL = getApiUrl();
-                  const response = await fetch(`${API_URL}/api/notifications/email-status`, {
-                    credentials: 'include'
-                  });
-
-                  if (response.status === 401) {
-                    console.warn('⚠️ Authentication required. Please login first.');
-                    if ("Notification" in window && Notification.permission === "granted") {
-                      new Notification("Authentication Required", {
-                        body: "Please login to check email status",
-                        icon: '/favicon.ico'
-                      });
-                    }
-                    return;
-                  }
-
-                  const data = await response.json();
-                  const status = data.configured && data.verified
-                    ? `✅ Email service is configured and verified!\n\nHost: ${data.host}:${data.port}\nUser: ${data.user}`
-                    : data.configured
-                      ? '⚠️ Email is configured but connection verification failed.'
-                      : '❌ Email service is not configured.';
-
-                  console.log(status);
-
-                  if (data.configured && data.verified) {
-                    setEmailEnabled(true);
-                    if ("Notification" in window && Notification.permission === "granted") {
-                      new Notification("Email Configured", {
-                        body: "Email service is ready to use",
-                        icon: '/favicon.ico'
-                      });
-                    }
-                  }
-                } catch (e) {
-                  console.error('Email status check error:', e);
-                }
-              }}
-              className="w-full px-3 py-2 bg-blue-50 border border-blue-200 text-blue-700 rounded hover:bg-blue-100 text-xs font-medium transition"
-            >
-              Check Email Configuration
-            </button>
-            <p className="text-[10px] text-slate-400 mt-1">Click to verify email service is configured properly.</p>
-          </div>
-
           <div className="flex items-center gap-2">
             <input
               type="checkbox"
@@ -305,26 +246,6 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({ balances
               Enable Email Notifications
             </label>
           </div>
-
-          <div className="flex items-center gap-2 mt-2">
-            <input
-              type="checkbox"
-              id="autoSend"
-              checked={autoSend}
-              onChange={e => setAutoSend(e.target.checked)}
-              disabled={!emailEnabled}
-              className="rounded text-primary"
-            />
-            <label htmlFor="autoSend" className={`text-xs font-semibold ${!emailEnabled ? 'text-gray-400' : 'text-slate-700'}`}>
-              Auto-Send via Email when scheduled (runs on server, no tab needed)
-            </label>
-          </div>
-
-          {isEnabled && autoSend && emailEnabled && (
-            <div className="mt-3 p-2 bg-blue-50 border border-blue-200 rounded text-xs text-blue-700">
-              <strong>📡 Background Mode Active:</strong> Emails will be sent automatically at {scheduledTime} every day, even when your browser is closed. The server handles everything!
-            </div>
-          )}
         </div>
       )}
 
@@ -342,7 +263,11 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({ balances
           </div>
           <div className="h-8 w-px bg-gray-300"></div>
           <button
-            onClick={() => setIsEnabled(!isEnabled)}
+            onClick={() => {
+              const newState = !isEnabled;
+              setIsEnabled(newState);
+              setAutoSend(newState);
+            }}
             className={`px-4 py-1.5 rounded-md text-xs font-bold transition ${isEnabled ? 'bg-green-100 text-green-700' : 'bg-gray-200 text-gray-500'}`}
           >
             {isEnabled ? 'AUTO ON' : 'AUTO OFF'}

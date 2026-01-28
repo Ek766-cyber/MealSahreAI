@@ -37,7 +37,6 @@ export const DataEntry: React.FC<DataEntryProps> = ({
         });
 
         if (response.status === 401) {
-          console.warn('⚠️ Not authenticated - skipping config load');
           setIsLoadingConfig(false);
           return;
         }
@@ -46,18 +45,15 @@ export const DataEntry: React.FC<DataEntryProps> = ({
           const data = await response.json();
           if (data.csvUrl) {
             setSheetUrl(data.csvUrl);
-            console.log('✅ Loaded saved CSV URL:', data.csvUrl);
           }
           if (data.lastFetchTime) {
             setLastFetchTime(new Date(data.lastFetchTime));
           }
           if (data.autoSyncEnabled !== undefined) {
             setAutoSyncEnabled(data.autoSyncEnabled);
-            console.log('✅ Loaded auto-sync enabled:', data.autoSyncEnabled);
           }
           if (data.autoSyncTime) {
             setSyncTime(data.autoSyncTime);
-            console.log('✅ Loaded auto-sync time:', data.autoSyncTime);
           }
         }
       } catch (error) {
@@ -92,10 +88,9 @@ export const DataEntry: React.FC<DataEntryProps> = ({
         });
 
         if (response.status === 401) {
-          console.warn('⚠️ Not authenticated - scheduler settings not saved');
+          // Not authenticated
         } else if (response.ok) {
           const data = await response.json();
-          console.log('✅ Auto-sync settings saved:', data);
         } else {
           console.error('Failed to save auto-sync settings');
         }
@@ -120,10 +115,9 @@ export const DataEntry: React.FC<DataEntryProps> = ({
         });
 
         if (configResponse.status === 401) {
-          console.warn('⚠️ Not authenticated - CSV URL not saved');
+          // Not authenticated
         } else if (configResponse.ok) {
           const data = await configResponse.json();
-          console.log('✅ CSV URL saved:', data.csvUrl);
         } else {
           console.error('Failed to save CSV URL');
         }
@@ -143,11 +137,10 @@ export const DataEntry: React.FC<DataEntryProps> = ({
         });
 
         if (timeResponse.status === 401) {
-          console.warn('⚠️ Not authenticated - fetch time not saved');
+          // Not authenticated
         } else if (timeResponse.ok) {
           const data = await timeResponse.json();
           setLastFetchTime(new Date(data.lastFetchTime));
-          console.log('✅ Fetch time updated:', data.lastFetchTime);
         }
       } catch (error) {
         console.error('Error updating fetch time:', error);
@@ -158,7 +151,6 @@ export const DataEntry: React.FC<DataEntryProps> = ({
   // Refresh synced data from database (to see server-side sync results)
   const handleRefreshData = async () => {
     try {
-      console.log('🔄 Refreshing data from database...');
       const API_URL = getApiUrl();
       const response = await fetch(`${API_URL}/api/sheet/config`, {
         credentials: 'include'
@@ -174,8 +166,6 @@ export const DataEntry: React.FC<DataEntryProps> = ({
 
         // Trigger parent component to reload synced data
         window.location.reload();
-
-        console.log('✅ Data refreshed from database');
       }
     } catch (error) {
       console.error('Error refreshing data:', error);
@@ -183,46 +173,8 @@ export const DataEntry: React.FC<DataEntryProps> = ({
   };
 
   const downloadExampleCsv = () => {
-    // Defines a structure matching the user's image:
-    // 1. Meal Grid (Left)
-    // 2. Deposit/Joma tables (Right - simulated empty headers for CSV alignment)
-    // 3. Totals
-    // 4. Summary Table (Meal Details, Cost, Available Balance)
-    // 5. Mil Rate
-    const csvContent =
-      `Date,Sayem,Golam,Emon,Jidhan,Ethon,Konok,Tot / day,,,,Date,Sayem,Joma,,Date,Golam,Joma
-1,,,,,,,,,,,,prev,122,,,,,
-2,,,,,,,,,,,,,,,
-3,1.00,1.00,1.00,1.00,1.00,0.00,5.00,,,,,,,,
-4,0.00,0.00,0.00,0.00,0.00,0.00,0.00,,,,,,,,
-5,1.00,1.00,1.00,0.00,1.00,0.00,4.00,,,,,,,,
-6,1.00,1.00,1.00,0.00,1.00,0.00,4.00,,,,,,,,
-,,,,,,,,,,,,,,,
-Total,6.50,3.50,7.50,1.00,7.50,3.50,29.50,,,,Total,0,122,,Total,280,-51
-,,,,,,,,,,,,,,,
-,,,,,,,,,,,,,,,
-Meal Details,Cost,Available Balance,,,,,,,,,,,
-Sayem,384,-262,,,,,,,,,,,
-Golam,207,-258,,,,,,,,,,,
-Emon,444,-9101,,,,,,,,,,,
-Jidhan,59,-39,,,,,,,,,,,
-Ethon,444,-381,,,,,,,,,,,
-Konok,207,41,,,,,,,,,,,
-,,,,,,,,,,,,,,,
-Total Joma,-8255,,,,,,,,,,,
-Total Bazer,1745,,,,,,,,,,,
-,,,,,,,,,,,,,,,
-Mil rate,59,,,,,,,,,,,
-`;
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-    const link = document.createElement('a');
-    const url = URL.createObjectURL(blob);
-    link.setAttribute('href', url);
-    link.setAttribute('download', 'meal_share_template.csv');
-    link.style.visibility = 'hidden';
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+    // Open the Google Sheets template in a new tab
+    window.open('https://docs.google.com/spreadsheets/d/1JgPUXuaxB3WNuiU06eCOPgmLg-BS45DN/edit?usp=sharing&ouid=105478924605376674457&rtpof=true&sd=true', '_blank');
   };
 
   return (
@@ -279,19 +231,9 @@ Mil rate,59,,,,,,,,,,,
             <button
               onClick={handleSync}
               disabled={isSyncing || !sheetUrl || isLoadingConfig}
-              className="flex-1 bg-primary text-white py-2 rounded-md hover:bg-indigo-700 transition flex justify-center items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+              className="w-full bg-primary text-white py-2 rounded-md hover:bg-indigo-700 transition flex justify-center items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {isSyncing ? 'Syncing...' : 'Sync Now'}
-            </button>
-
-            <button
-              onClick={handleRefreshData}
-              title="Reload data synced by server"
-              className="px-4 bg-gray-100 text-gray-700 py-2 rounded-md hover:bg-gray-200 transition flex justify-center items-center gap-2"
-            >
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-              </svg>
             </button>
           </div>
 
@@ -330,29 +272,7 @@ Mil rate,59,,,,,,,,,,,
             />
             {autoSyncEnabled ? (
               <div className="mt-2 p-2 bg-green-50 border border-green-200 rounded text-xs text-green-700">
-                <div className="flex items-center justify-between">
-                  <span><strong>✅ Active:</strong> Data will sync automatically at {syncTime} daily (runs on server, no tab needed)</span>
-                  <button
-                    onClick={async () => {
-                      try {
-                        const API_URL = getApiUrl();
-                        const response = await fetch(`${API_URL}/api/sheet/trigger-manual-sync`, {
-                          method: 'POST',
-                          credentials: 'include'
-                        });
-                        if (response.ok) {
-                          console.log('✅ Manual sync triggered - check server logs');
-                          setTimeout(() => handleRefreshData(), 3000); // Refresh after 3 seconds
-                        }
-                      } catch (error) {
-                        console.error('Error triggering manual sync:', error);
-                      }
-                    }}
-                    className="ml-2 px-2 py-1 bg-white border border-green-300 text-green-700 rounded text-[10px] hover:bg-green-50"
-                  >
-                    Test Now
-                  </button>
-                </div>
+                <span><strong>✅ Active:</strong> Data will sync automatically at {syncTime} daily.</span>
               </div>
             ) : (
               <p className="text-[10px] text-blue-600 mt-2 leading-tight">
