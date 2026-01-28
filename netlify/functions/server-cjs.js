@@ -6,6 +6,7 @@ const dotenv = require("dotenv");
 const mongoose = require("mongoose");
 const passport = require("passport");
 const GoogleStrategy = require("passport-google-oauth20").Strategy;
+const nodemailer = require("nodemailer");
 
 // Load environment variables
 dotenv.config();
@@ -62,6 +63,14 @@ const userSchema = new mongoose.Schema({
   sheetMealRate: Number,
   autoSyncEnabled: { type: Boolean, default: false },
   autoSyncTime: { type: String, default: "09:00" },
+  notificationConfig: {
+    scheduledTime: { type: String, default: "18:00" },
+    threshold: { type: Number, default: 100 },
+    emailEnabled: { type: Boolean, default: false },
+    autoSend: { type: Boolean, default: false },
+    isEnabled: { type: Boolean, default: false },
+    tone: { type: String, default: "friendly" },
+  },
   createdAt: { type: Date, default: Date.now },
   lastLogin: Date,
 });
@@ -95,13 +104,118 @@ const memberSchema = new mongoose.Schema(
   },
   {
     timestamps: true,
-  }
+  },
 );
 
 // Compound index to ensure unique sheet names per user
 memberSchema.index({ userId: 1, sheetName: 1 }, { unique: true });
 
 const Member = mongoose.models.Member || mongoose.model("Member", memberSchema);
+
+// ==================== EMAIL SERVICE ====================
+class EmailService {
+  constructor() {
+    this.transporter = null;
+    this.initializeTransporter();
+  }
+
+  initializeTransporter() {
+    const emailConfig = {
+      host: process.env.EMAIL_HOST || "smtp.gmail.com",
+      port: parseInt(process.env.EMAIL_PORT || "587"),
+      secure: process.env.EMAIL_SECURE === "true",
+      auth: {
+        user: process.env.EMAIL_USER,
+        pass: process.env.EMAIL_PASSWORD,
+      },
+    };
+
+    if (emailConfig.auth.user && emailConfig.auth.pass) {
+      this.transporter = nodemailer.createTransport(emailConfig);
+      console.log("✉️  Email service initialized");
+    } else {
+      console.warn(
+        "⚠️  Email credentials not configured. Email service disabled.",
+      );
+    }
+  }
+
+  async verifyConnection() {
+    if (!this.transporter) {
+      return false;
+    }
+
+    try {
+      await this.transporter.verify();
+      console.log("✅ Email server connection verified");
+      return true;
+    } catch (error) {
+      console.error("❌ Email server connection failed:", error);
+      return false;
+    }
+  }
+
+  generateDefaultHTML(subject, text) {
+    return `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <style>
+          body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
+          .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+          .header { background-color: #4CAF50; color: white; padding: 20px; text-align: center; border-radius: 5px 5px 0 0; }
+          .content { background-color: #f9f9f9; padding: 20px; border-radius: 0 0 5px 5px; }
+          .footer { margin-top: 20px; text-align: center; color: #666; font-size: 12px; }
+        </style>
+      </head>
+      <body>
+        <div class="container">
+          <div class="header">
+            <h1>${subject}</h1>
+          </div>
+          <div class="content">
+            <p style="white-space: pre-wrap;">${text}</p>
+          </div>
+          <div class="footer">
+            <p>This is an automated message from MealShare AI</p>
+          </div>
+        </div>
+      </body>
+      </html>
+    `;
+  }
+
+  async sendNotificationEmail(to, recipientName, message, amountOwed = 0) {
+    if (!this.transporter) {
+      console.error("❌ Email service not initialized");
+      return false;
+    }
+
+    try {
+      const subject =
+        amountOwed > 0
+          ? `MealShare Payment Reminder - ৳${amountOwed}`
+          : "MealShare Notification";
+
+      const mailOptions = {
+        from: `"MealShare AI" <${process.env.EMAIL_USER}>`,
+        to,
+        subject,
+        text: message,
+        html: this.generateDefaultHTML(subject, message),
+      };
+
+      await this.transporter.sendMail(mailOptions);
+      console.log(`✅ Email sent to ${to}`);
+      return true;
+    } catch (error) {
+      console.error(`❌ Failed to send email to ${to}:`, error);
+      return false;
+    }
+  }
+}
+
+const emailService = new EmailService();
 
 // Configure Passport
 passport.use(
@@ -136,8 +250,8 @@ passport.use(
       } catch (error) {
         done(error, undefined);
       }
-    }
-  )
+    },
+  ),
 );
 
 passport.serializeUser((user, done) => {
@@ -173,7 +287,7 @@ app.use(
     credentials: true,
     methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     allowedHeaders: ["Content-Type", "Authorization"],
-  })
+  }),
 );
 
 app.use(express.json());
@@ -192,7 +306,7 @@ app.use(
       sameSite: process.env.NODE_ENV === "production" ? "none" : "lax",
       path: "/",
     },
-  })
+  }),
 );
 
 // Passport middleware
@@ -248,7 +362,7 @@ app.get(
     console.log("Auth successful, redirecting...");
     const clientUrl = process.env.CLIENT_URL || "http://localhost:5173";
     res.redirect(`${clientUrl}/dashboard`);
-  }
+  },
 );
 
 app.get("/auth/user", (req, res) => {
@@ -295,7 +409,13 @@ app.post("/api/members", isAuthenticated, async (req, res) => {
     const userId = req.user._id;
     const { sheetName, email, phone } = req.body;
 
+    console.log("📝 Add member request:", { sheetName, email, phone });
+
     if (!sheetName || !email) {
+      console.error("❌ Missing required fields:", {
+        sheetName: !!sheetName,
+        email: !!email,
+      });
       return res
         .status(400)
         .json({ error: "Sheet name and email are required" });
@@ -356,7 +476,7 @@ app.put("/api/members/:id", isAuthenticated, async (req, res) => {
     const updatedMember = await Member.findOneAndUpdate(
       { _id: id, userId },
       { sheetName, email, phone: phone || null },
-      { new: true, runValidators: true }
+      { new: true, runValidators: true },
     );
 
     if (!updatedMember) {
@@ -393,7 +513,7 @@ app.get("/api/sheet/config", isAuthenticated, async (req, res) => {
   try {
     const userId = req.user._id;
     const user = await User.findById(userId).select(
-      "csvUrl lastFetchTime syncedPeople sheetMealRate autoSyncEnabled autoSyncTime"
+      "csvUrl lastFetchTime syncedPeople sheetMealRate autoSyncEnabled autoSyncTime",
     );
 
     res.json({
@@ -415,7 +535,12 @@ app.post("/api/sheet/config", isAuthenticated, async (req, res) => {
     const userId = req.user._id;
     const { csvUrl } = req.body;
 
+    console.log("📝 Save CSV URL request:", {
+      csvUrl: csvUrl?.substring(0, 50) + "...",
+    });
+
     if (!csvUrl) {
+      console.error("❌ Missing csvUrl in request body");
       return res.status(400).json({ error: "CSV URL is required" });
     }
 
@@ -423,6 +548,7 @@ app.post("/api/sheet/config", isAuthenticated, async (req, res) => {
     try {
       new URL(csvUrl);
     } catch {
+      console.error("❌ Invalid URL format:", csvUrl);
       return res.status(400).json({ error: "Invalid URL format" });
     }
 
@@ -434,7 +560,13 @@ app.post("/api/sheet/config", isAuthenticated, async (req, res) => {
     user.csvUrl = csvUrl;
     await user.save();
 
-    res.json({ message: "CSV URL saved successfully", csvUrl });
+    console.log("✅ CSV URL saved successfully");
+
+    res.json({
+      success: true,
+      message: "CSV URL saved successfully",
+      csvUrl,
+    });
   } catch (error) {
     console.error("Error saving CSV URL:", error);
     res.status(500).json({ error: "Failed to save CSV URL" });
@@ -444,10 +576,10 @@ app.post("/api/sheet/config", isAuthenticated, async (req, res) => {
 app.post("/api/sheet/save-data", isAuthenticated, async (req, res) => {
   try {
     const userId = req.user._id;
-    const { syncedPeople, sheetMealRate } = req.body;
+    const { people, sheetMealRate } = req.body;
 
-    if (!syncedPeople || !Array.isArray(syncedPeople)) {
-      return res.status(400).json({ error: "Invalid synced people data" });
+    if (!people || !Array.isArray(people)) {
+      return res.status(400).json({ error: "Invalid people data" });
     }
 
     const user = await User.findById(userId);
@@ -455,18 +587,285 @@ app.post("/api/sheet/save-data", isAuthenticated, async (req, res) => {
       return res.status(404).json({ error: "User not found" });
     }
 
-    user.syncedPeople = syncedPeople;
+    user.syncedPeople = people;
     user.sheetMealRate = sheetMealRate;
     user.lastFetchTime = new Date();
     await user.save();
 
     res.json({
+      success: true,
       message: "Data saved successfully",
+      peopleCount: people.length,
       lastFetchTime: user.lastFetchTime,
     });
   } catch (error) {
     console.error("Error saving sheet data:", error);
     res.status(500).json({ error: "Failed to save sheet data" });
+  }
+});
+
+// Update last fetch time
+app.post("/api/sheet/update-fetch-time", isAuthenticated, async (req, res) => {
+  try {
+    const userId = req.user._id;
+    const user = await User.findById(userId);
+
+    if (!user) {
+      return res.status(404).json({ error: "User not found" });
+    }
+
+    user.lastFetchTime = new Date();
+    await user.save();
+
+    console.log(`✅ Last fetch time updated for user ${user.email}`);
+
+    res.json({
+      success: true,
+      lastFetchTime: user.lastFetchTime,
+      message: "Fetch time updated successfully",
+    });
+  } catch (error) {
+    console.error("Error updating fetch time:", error);
+    res.status(500).json({ error: "Failed to update fetch time" });
+  }
+});
+
+// Save auto-sync scheduler settings
+app.post("/api/sheet/save-scheduler", isAuthenticated, async (req, res) => {
+  try {
+    const userId = req.user._id;
+    const { autoSyncEnabled, autoSyncTime } = req.body;
+
+    const user = await User.findById(userId);
+    if (!user) {
+      return res.status(404).json({ error: "User not found" });
+    }
+
+    if (autoSyncEnabled !== undefined) user.autoSyncEnabled = autoSyncEnabled;
+    if (autoSyncTime !== undefined) user.autoSyncTime = autoSyncTime;
+    await user.save();
+
+    console.log(`✅ Auto-sync settings saved for user ${user.email}`);
+
+    res.json({
+      success: true,
+      message: "Auto-sync settings saved successfully",
+      autoSyncEnabled: user.autoSyncEnabled,
+      autoSyncTime: user.autoSyncTime,
+    });
+  } catch (error) {
+    console.error("Error saving auto-sync settings:", error);
+    res.status(500).json({ error: "Failed to save auto-sync settings" });
+  }
+});
+
+// ==================== NOTIFICATION ROUTES ====================
+
+// Send email notification
+app.post("/api/notifications/send-email", isAuthenticated, async (req, res) => {
+  try {
+    const { personId, email, name, message, amountOwed } = req.body;
+
+    console.log("📧 Send email request:", {
+      personId,
+      name,
+      email,
+      amountOwed,
+    });
+
+    if (!message || !name) {
+      return res.status(400).json({
+        success: false,
+        error: "Missing required fields: name and message",
+      });
+    }
+
+    let recipientEmail = email;
+
+    // If personId is provided, look up the member's email
+    if (!recipientEmail) {
+      const member = await Member.findOne({
+        userId: req.user._id,
+        sheetName: { $regex: new RegExp(`^${name}$`, "i") },
+      });
+
+      console.log(
+        "🔍 Member lookup result:",
+        member ? `Found: ${member.email}` : "Not found",
+      );
+
+      if (member) {
+        recipientEmail = member.email;
+      }
+    }
+
+    if (!recipientEmail) {
+      console.warn(`⚠️ No email found for member: ${name}`);
+      return res.status(400).json({
+        success: false,
+        error: `No email address found for member "${name}". Please add them in Member Manager.`,
+      });
+    }
+
+    // Validate email format
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(recipientEmail)) {
+      return res.status(400).json({
+        success: false,
+        error: "Invalid email address format",
+      });
+    }
+
+    console.log(`📮 Sending email to: ${recipientEmail}`);
+
+    const success = await emailService.sendNotificationEmail(
+      recipientEmail,
+      name,
+      message,
+      amountOwed,
+    );
+
+    if (success) {
+      console.log(`✅ Email sent successfully to ${recipientEmail}`);
+      res.json({
+        success: true,
+        message: `Email sent successfully to ${recipientEmail}`,
+      });
+    } else {
+      console.error(`❌ Failed to send email to ${recipientEmail}`);
+      res.status(500).json({
+        success: false,
+        error: "Failed to send email. Check server logs for details.",
+      });
+    }
+  } catch (error) {
+    console.error("Error in /send-email:", error);
+    res.status(500).json({
+      success: false,
+      error: "Internal server error while sending email",
+    });
+  }
+});
+
+// Check email service status
+app.get(
+  "/api/notifications/email-status",
+  isAuthenticated,
+  async (req, res) => {
+    try {
+      const isConfigured = process.env.EMAIL_USER && process.env.EMAIL_PASSWORD;
+      const isVerified = isConfigured
+        ? await emailService.verifyConnection()
+        : false;
+
+      res.json({
+        configured: !!isConfigured,
+        verified: isVerified,
+        host: process.env.EMAIL_HOST || "smtp.gmail.com",
+        port: process.env.EMAIL_PORT || "587",
+        user: process.env.EMAIL_USER
+          ? process.env.EMAIL_USER.replace(/(.{3}).*(@.*)/, "$1***$2")
+          : "Not configured",
+      });
+    } catch (error) {
+      console.error("Error checking email status:", error);
+      res.status(500).json({
+        success: false,
+        error: "Failed to check email status",
+      });
+    }
+  },
+);
+
+// Get notification configuration
+app.get("/api/notifications/config", isAuthenticated, async (req, res) => {
+  try {
+    const userId = req.user._id;
+    const user = await User.findById(userId).select("notificationConfig");
+
+    const config = user?.notificationConfig || {
+      scheduledTime: "18:00",
+      threshold: 100,
+      emailEnabled: false,
+      autoSend: false,
+      isEnabled: false,
+      tone: "friendly",
+    };
+
+    res.json({
+      success: true,
+      config,
+    });
+  } catch (error) {
+    console.error("Error fetching notification config:", error);
+    res.status(500).json({
+      success: false,
+      error: "Failed to fetch notification configuration",
+    });
+  }
+});
+
+// Save notification configuration
+app.post("/api/notifications/config", isAuthenticated, async (req, res) => {
+  try {
+    const userId = req.user._id;
+    const {
+      scheduledTime,
+      threshold,
+      emailEnabled,
+      autoSend,
+      isEnabled,
+      tone,
+    } = req.body;
+
+    const user = await User.findById(userId);
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        error: "User not found",
+      });
+    }
+
+    // Initialize notificationConfig if it doesn't exist
+    if (!user.notificationConfig) {
+      user.notificationConfig = {
+        scheduledTime: "18:00",
+        threshold: 100,
+        emailEnabled: false,
+        autoSend: false,
+        isEnabled: false,
+        tone: "friendly",
+      };
+    }
+
+    // Update only provided fields
+    if (scheduledTime !== undefined)
+      user.notificationConfig.scheduledTime = scheduledTime;
+    if (threshold !== undefined) user.notificationConfig.threshold = threshold;
+    if (emailEnabled !== undefined)
+      user.notificationConfig.emailEnabled = emailEnabled;
+    if (autoSend !== undefined) user.notificationConfig.autoSend = autoSend;
+    if (isEnabled !== undefined) user.notificationConfig.isEnabled = isEnabled;
+    if (tone !== undefined) user.notificationConfig.tone = tone;
+
+    await user.save();
+
+    console.log(
+      `✅ Notification config saved for user ${user.email}:`,
+      user.notificationConfig,
+    );
+
+    res.json({
+      success: true,
+      message: "Notification configuration saved successfully",
+      config: user.notificationConfig,
+    });
+  } catch (error) {
+    console.error("Error saving notification config:", error);
+    res.status(500).json({
+      success: false,
+      error: "Failed to save notification configuration",
+    });
   }
 });
 
