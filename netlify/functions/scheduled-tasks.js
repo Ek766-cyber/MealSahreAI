@@ -1,3 +1,7 @@
+// Netlify Scheduled Function - Runs every hour
+// Schedule: 0 * * * * (every hour at minute 0)
+// Configure schedule in Netlify dashboard: Site settings > Functions > scheduled-tasks
+
 const mongoose = require("mongoose");
 const nodemailer = require("nodemailer");
 const dotenv = require("dotenv");
