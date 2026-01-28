@@ -300,8 +300,19 @@ app.use(
   }),
 );
 
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
+// Body parsing middleware with larger size limits for serverless
+app.use(express.json({ limit: "10mb" }));
+app.use(express.urlencoded({ extended: true, limit: "10mb" }));
+
+// Log incoming requests for debugging
+app.use((req, res, next) => {
+  console.log(`📥 ${req.method} ${req.path}`, {
+    body: req.body,
+    hasBody: Object.keys(req.body || {}).length > 0,
+    contentType: req.headers["content-type"],
+  });
+  next();
+});
 
 // Session configuration with MongoDB store
 app.use(
@@ -668,12 +679,39 @@ app.post("/api/sheet/save-scheduler", isAuthenticated, async (req, res) => {
 // Send email notification
 app.post("/api/notifications/send-email", isAuthenticated, async (req, res) => {
   try {
+    console.log("📧 Send email request received:", {
+      body: req.body,
+      bodyKeys: Object.keys(req.body || {}),
+      contentType: req.headers["content-type"],
+    });
+
     const { personId, email, name, message, amountOwed } = req.body;
 
+    console.log("📧 Extracted fields:", {
+      personId,
+      email,
+      name,
+      message,
+      amountOwed,
+    });
+
     if (!message || !name) {
+      console.error("❌ Missing required fields:", {
+        name,
+        message,
+        hasMessage: !!message,
+        hasName: !!name,
+      });
       return res.status(400).json({
         success: false,
         error: "Missing required fields: name and message",
+        debug: {
+          receivedBody: req.body,
+          name: name,
+          message: message,
+          hasName: !!name,
+          hasMessage: !!message,
+        },
       });
     }
 
@@ -850,6 +888,34 @@ app.post("/api/notifications/config", isAuthenticated, async (req, res) => {
     });
   }
 });
+
+// Manual trigger for scheduled tasks (for testing)
+app.post(
+  "/api/notifications/trigger-scheduled-tasks",
+  isAuthenticated,
+  async (req, res) => {
+    try {
+      console.log("🔔 Manual trigger for scheduled tasks");
+
+      // Call the scheduled tasks function
+      const scheduledTasksHandler = require("./scheduled-tasks.js").handler;
+      const result = await scheduledTasksHandler({}, {});
+
+      res.json({
+        success: true,
+        message: "Scheduled tasks triggered successfully",
+        result: JSON.parse(result.body),
+      });
+    } catch (error) {
+      console.error("Error triggering scheduled tasks:", error);
+      res.status(500).json({
+        success: false,
+        error: "Failed to trigger scheduled tasks",
+        message: error.message,
+      });
+    }
+  },
+);
 
 // Catch-all route for debugging
 app.use((req, res, next) => {

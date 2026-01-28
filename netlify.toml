@@ -7,6 +7,11 @@
   # Use esbuild to bundle everything properly
   node_bundler = "esbuild"
 
+# Scheduled function to run every hour
+[[functions]]
+  path = "/.netlify/functions/scheduled-tasks"
+  schedule = "0 * * * *"  # Run every hour at minute 0
+
 [dev]
   command = "npm run dev"
   port = 8888
