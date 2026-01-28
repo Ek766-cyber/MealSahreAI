@@ -300,14 +300,23 @@ app.use(
   }),
 );
 
-// Body parsing middleware with larger size limits for serverless
-app.use(express.json({ limit: "10mb" }));
-app.use(express.urlencoded({ extended: true, limit: "10mb" }));
-
-// Fix for serverless-http body parsing issue
+// Fix for serverless-http body parsing issue - MUST RUN BEFORE express.json()
 app.use((req, res, next) => {
-  // If body is an array (raw bytes from serverless-http), parse it manually
+  // Handle Buffer (raw bytes from serverless-http)
   if (
+    Buffer.isBuffer(req.body) &&
+    req.headers["content-type"]?.includes("application/json")
+  ) {
+    try {
+      const bodyString = req.body.toString("utf8");
+      req.body = JSON.parse(bodyString);
+      console.log("✅ Manually parsed Buffer body:", req.body);
+    } catch (error) {
+      console.error("❌ Failed to parse Buffer body:", error);
+    }
+  }
+  // Handle array (raw bytes from serverless-http - old format)
+  else if (
     Array.isArray(req.body) &&
     req.headers["content-type"]?.includes("application/json")
   ) {
@@ -317,13 +326,17 @@ app.use((req, res, next) => {
         .map((code) => String.fromCharCode(code))
         .join("");
       req.body = JSON.parse(bodyString);
-      console.log("✅ Manually parsed JSON body:", req.body);
+      console.log("✅ Manually parsed array body:", req.body);
     } catch (error) {
-      console.error("❌ Failed to parse body:", error);
+      console.error("❌ Failed to parse array body:", error);
     }
   }
   next();
 });
+
+// Body parsing middleware with larger size limits for serverless
+app.use(express.json({ limit: "10mb" }));
+app.use(express.urlencoded({ extended: true, limit: "10mb" }));
 
 // Log incoming requests for debugging
 app.use((req, res, next) => {
