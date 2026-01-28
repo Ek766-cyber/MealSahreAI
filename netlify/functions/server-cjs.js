@@ -317,7 +317,7 @@ app.use(
       process.env.SESSION_SECRET || "fallback-secret-key-change-in-production",
     resave: false,
     saveUninitialized: false,
-    store: MongoStore.create({
+    store: new MongoStore({
       mongoUrl: process.env.MONGODB_URI,
       ttl: 24 * 60 * 60, // 1 day
       autoRemove: "native",
