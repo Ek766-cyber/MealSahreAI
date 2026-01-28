@@ -1,6 +1,7 @@
 const serverless = require("serverless-http");
 const express = require("express");
 const session = require("express-session");
+const MongoStore = require("connect-mongo");
 const cors = require("cors");
 const dotenv = require("dotenv");
 const mongoose = require("mongoose");
@@ -283,29 +284,58 @@ app.use(async (req, res, next) => {
 // Middleware
 app.use(
   cors({
-    origin: process.env.CLIENT_URL || "*",
+    origin: function (origin, callback) {
+      // Allow requests with no origin (mobile apps, Postman, etc.)
+      if (!origin) return callback(null, true);
+
+      const allowedOrigins = [
+        process.env.CLIENT_URL,
+        "http://localhost:5173",
+        "http://localhost:5000",
+      ].filter(Boolean);
+
+      if (allowedOrigins.indexOf(origin) !== -1) {
+        callback(null, true);
+      } else {
+        callback(null, true); // Allow all origins in development
+      }
+    },
     credentials: true,
     methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-    allowedHeaders: ["Content-Type", "Authorization"],
+    allowedHeaders: ["Content-Type", "Authorization", "Cookie"],
+    exposedHeaders: ["set-cookie"],
   }),
 );
 
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// Session configuration
+// Session configuration with MongoDB store
 app.use(
   session({
-    secret: process.env.SESSION_SECRET || "fallback-secret",
-    resave: true, // Changed to true for serverless
+    secret:
+      process.env.SESSION_SECRET || "fallback-secret-key-change-in-production",
+    resave: false,
     saveUninitialized: false,
-    rolling: true, // Reset maxAge on every response
+    store: MongoStore.create({
+      mongoUrl: process.env.MONGODB_URI,
+      ttl: 24 * 60 * 60, // 1 day
+      autoRemove: "native",
+      touchAfter: 24 * 3600, // Lazy session update
+      crypto: {
+        secret:
+          process.env.SESSION_SECRET ||
+          "fallback-secret-key-change-in-production",
+      },
+    }),
+    name: "mealshare.sid",
     cookie: {
-      maxAge: 24 * 60 * 60 * 1000,
+      maxAge: 24 * 60 * 60 * 1000, // 1 day
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
       sameSite: process.env.NODE_ENV === "production" ? "none" : "lax",
       path: "/",
+      domain: process.env.NODE_ENV === "production" ? undefined : "localhost",
     },
   }),
 );
