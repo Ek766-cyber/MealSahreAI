@@ -1,7 +1,7 @@
 const serverless = require("serverless-http");
 const express = require("express");
 const session = require("express-session");
-const MongoStore = require("connect-mongo");
+const MongoStore = require("connect-mongo").default;
 const cors = require("cors");
 const dotenv = require("dotenv");
 const mongoose = require("mongoose");
@@ -317,7 +317,7 @@ app.use(
       process.env.SESSION_SECRET || "fallback-secret-key-change-in-production",
     resave: false,
     saveUninitialized: false,
-    store: new MongoStore({
+    store: MongoStore.create({
       mongoUrl: process.env.MONGODB_URI,
       ttl: 24 * 60 * 60, // 1 day
       autoRemove: "native",
