@@ -7,6 +7,11 @@
   # Use esbuild to bundle everything properly
   node_bundler = "esbuild"
 
+# Configure scheduled function to run every 15 minutes
+# This allows users to set precise times like 1:15 AM, 3:30 PM, etc.
+[functions."scheduled-tasks"]
+  schedule = "* * * * *"
+
 [dev]
   command = "npm run dev"
   port = 8888
