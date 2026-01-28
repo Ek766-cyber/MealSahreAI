@@ -304,6 +304,27 @@ app.use(
 app.use(express.json({ limit: "10mb" }));
 app.use(express.urlencoded({ extended: true, limit: "10mb" }));
 
+// Fix for serverless-http body parsing issue
+app.use((req, res, next) => {
+  // If body is an array (raw bytes from serverless-http), parse it manually
+  if (
+    Array.isArray(req.body) &&
+    req.headers["content-type"]?.includes("application/json")
+  ) {
+    try {
+      // Convert array of character codes to string
+      const bodyString = req.body
+        .map((code) => String.fromCharCode(code))
+        .join("");
+      req.body = JSON.parse(bodyString);
+      console.log("✅ Manually parsed JSON body:", req.body);
+    } catch (error) {
+      console.error("❌ Failed to parse body:", error);
+    }
+  }
+  next();
+});
+
 // Log incoming requests for debugging
 app.use((req, res, next) => {
   console.log(`📥 ${req.method} ${req.path}`, {

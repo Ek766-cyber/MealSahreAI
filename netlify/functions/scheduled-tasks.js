@@ -411,11 +411,15 @@ exports.handler = async (event, context) => {
     console.log(`📋 Found ${syncUsers.length} users with auto-sync enabled`);
 
     for (const user of syncUsers) {
-      const [scheduledHour, scheduledMinute = 0] = user.autoSyncTime.split(":").map(Number);
+      const [scheduledHour, scheduledMinute = 0] = user.autoSyncTime
+        .split(":")
+        .map(Number);
 
       // Check if current hour matches scheduled hour (triggers anytime within that hour)
       if (currentHour === scheduledHour) {
-        console.log(`🔄 Auto-syncing data for user ${user.email} (scheduled: ${user.autoSyncTime}, current: ${currentTime})`);
+        console.log(
+          `🔄 Auto-syncing data for user ${user.email} (scheduled: ${user.autoSyncTime}, current: ${currentTime})`,
+        );
         await syncSheetData(user);
       }
     }
