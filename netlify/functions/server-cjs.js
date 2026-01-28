@@ -297,8 +297,9 @@ app.use(express.urlencoded({ extended: true }));
 app.use(
   session({
     secret: process.env.SESSION_SECRET || "fallback-secret",
-    resave: false,
+    resave: true, // Changed to true for serverless
     saveUninitialized: false,
+    rolling: true, // Reset maxAge on every response
     cookie: {
       maxAge: 24 * 60 * 60 * 1000,
       httpOnly: true,
@@ -317,6 +318,13 @@ app.use(passport.session());
 app.use((req, res, next) => {
   console.log(`Incoming request: ${req.method} ${req.path}`);
   console.log(`Original URL: ${req.originalUrl}`);
+  console.log(`Has session: ${!!req.session}`);
+  console.log(`Session ID: ${req.sessionID}`);
+  console.log(`Cookies: ${JSON.stringify(req.cookies)}`);
+  console.log(`Authenticated: ${req.isAuthenticated()}`);
+  if (req.user) {
+    console.log(`User: ${req.user.email}`);
+  }
   next();
 });
 
@@ -359,9 +367,20 @@ app.get(
     passport.authenticate("google", { failureRedirect: "/" })(req, res, next);
   },
   (req, res) => {
-    console.log("Auth successful, redirecting...");
-    const clientUrl = process.env.CLIENT_URL || "http://localhost:5173";
-    res.redirect(`${clientUrl}/dashboard`);
+    console.log("Auth successful, session ID:", req.sessionID);
+    console.log("User:", req.user?.email);
+
+    // Explicitly save the session before redirecting
+    req.session.save((err) => {
+      if (err) {
+        console.error("Session save error:", err);
+      } else {
+        console.log("Session saved successfully");
+      }
+
+      const clientUrl = process.env.CLIENT_URL || "http://localhost:5173";
+      res.redirect(`${clientUrl}/dashboard`);
+    });
   },
 );
 
@@ -384,9 +403,21 @@ app.post("/auth/logout", (req, res) => {
 
 // Middleware to check authentication
 const isAuthenticated = (req, res, next) => {
+  console.log("🔐 Auth check:", {
+    authenticated: req.isAuthenticated(),
+    hasUser: !!req.user,
+    hasSession: !!req.session,
+    sessionID: req.sessionID,
+    path: req.path,
+    method: req.method,
+  });
+
   if (req.isAuthenticated()) {
+    console.log("✅ User authenticated:", req.user?.email);
     return next();
   }
+
+  console.log("❌ Authentication failed - no valid session");
   res.status(401).json({ error: "Not authenticated" });
 };
 
